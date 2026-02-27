@@ -4,4 +4,124 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  ARCHIVED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         Role     @default(USER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  ownedProjects   Project[] @relation("ProjectOwner")
+  projectMembers  ProjectMember[]
+  tasksCreated    Task[]    @relation("TaskCreatedBy")
+  tasksAssigned   Task[]    @relation("TaskAssignedTo")
+  comments        Comment[]
+
+  @@index([deletedAt])
+}
+
+model Project {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+
+  ownerId String
+  owner   User   @relation("ProjectOwner", fields: [ownerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tasks   Task[]
+  members ProjectMember[]
+
+  @@index([ownerId])
+  @@index([deletedAt])
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+
+  project Project @relation(fields: [projectId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@id([projectId, userId])
+  @@index([userId])
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("TaskCreatedBy", fields: [createdById], references: [id])
+
+  assignedToId String?
+  assignedTo   User?  @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  comments Comment[]
+
+  @@index([projectId])
+  @@index([createdById])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Comment {
+  id      String @id @default(uuid())
+  content String
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id])
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([taskId])
+  @@index([authorId])
+  @@index([deletedAt])
 }
