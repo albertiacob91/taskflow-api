@@ -10,7 +10,7 @@ export class UsersController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @ApiOkResponse({ description: 'Return current user profile' })
   async me(@Req() req: any) {
     const userId = req.user?.userId as string;
