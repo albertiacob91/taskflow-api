@@ -14,6 +14,8 @@ import { ProjectsModule } from './projects/projects.module';
 
 import { TasksModule } from './tasks/tasks.module';
 
+import { CommentsModule } from './comments/comments.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -22,6 +24,7 @@ import { TasksModule } from './tasks/tasks.module';
     ProjectsModule,
     TasksModule,
     UsersModule,
+    CommentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
