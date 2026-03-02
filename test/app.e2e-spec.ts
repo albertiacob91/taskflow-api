@@ -196,4 +196,91 @@ describe('TaskFlow API (e2e)', () => {
 
   expect(list2.body.items.some((t: any) => t.id === taskId)).toBe(false);
 });
+
+it('comments -> create -> list (filter by taskId) -> update -> delete (author only)', async () => {
+  const email = `e2e_comment_${Date.now()}@example.com`;
+
+  // register
+  const register = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({
+      email,
+      password: 'Password123!',
+      name: 'E2E Comment User',
+    })
+    .expect(201);
+
+  const token = register.body.accessToken as string;
+
+  // create project
+  const createdProject = await request(app.getHttpServer())
+    .post('/projects')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ name: 'Comments Project', description: 'Project for comments e2e' })
+    .expect(201);
+
+  const projectId = createdProject.body.id as string;
+
+  // create task
+  const createdTask = await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      title: 'Comment Task',
+      description: 'Task for comments',
+      projectId,
+      status: 'TODO',
+      priority: 'MEDIUM',
+    })
+    .expect(201);
+
+  const taskId = createdTask.body.id as string;
+
+  // create comment
+  const createdComment = await request(app.getHttpServer())
+    .post('/comments')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      content: 'First comment!',
+      taskId,
+    })
+    .expect(201);
+
+  expect(createdComment.body).toHaveProperty('id');
+  const commentId = createdComment.body.id as string;
+
+  // list comments filtered by taskId
+  const list = await request(app.getHttpServer())
+    .get(`/comments?taskId=${taskId}&page=1&limit=10`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(Array.isArray(list.body.items)).toBe(true);
+  expect(list.body.items.some((c: any) => c.id === commentId)).toBe(true);
+
+  // update comment (author)
+  const updated = await request(app.getHttpServer())
+    .patch(`/comments/${commentId}`)
+    .set('Authorization', `Bearer ${token}`)
+    .send({ content: 'Updated comment!' })
+    .expect(200);
+
+  expect(updated.body.content).toBe('Updated comment!');
+
+  // delete comment (soft)
+  const deleted = await request(app.getHttpServer())
+    .delete(`/comments/${commentId}`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(deleted.body).toEqual({ ok: true });
+
+  // list again (should NOT include after soft delete)
+  const list2 = await request(app.getHttpServer())
+    .get(`/comments?taskId=${taskId}&page=1&limit=10`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(list2.body.items.some((c: any) => c.id === commentId)).toBe(false);
+});
 });
