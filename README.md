@@ -1,98 +1,166 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# TaskFlow API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+TaskFlow is a REST API for project and task management built with **NestJS**.
+It includes **JWT authentication**, **Swagger documentation** and **end-to-end tests**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+This project is designed as a **portfolio backend project**, following real-world practices
+(branching strategy, migrations, authentication, testing).
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Tech Stack
+- Node.js + TypeScript
+- NestJS
+- PostgreSQL (Docker)
+- Prisma ORM + migrations
+- JWT authentication
+- Swagger / OpenAPI
+- Jest + Supertest (e2e tests)
 
-## Project setup
+---
 
+## Requirements
+- Node.js (recommended: LTS)
+- Docker & Docker Compose
+- Git
+
+---
+
+## Quick Start
+
+### 1) Install dependencies
 ```bash
-$ npm install
+npm install
 ```
 
-## Compile and run the project
+---
 
+### 2) Start PostgreSQL with Docker
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+docker compose up -d
+docker ps
 ```
 
-## Run tests
+The database is exposed on `127.0.0.1:5433`
+(see `docker-compose.yml`).
+
+---
+
+### 3) Configure environment variables
+Create a `.env` file from the example:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+cp .env.example .env
 ```
 
-## Deployment
+Required variables:
+- `DATABASE_URL`
+- `JWT_ACCESS_SECRET`
+- `JWT_ACCESS_EXPIRES_IN`
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+---
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 4) Run database migrations
+```bash
+npx prisma migrate dev
+```
+
+---
+
+### 5) Start the API
+```bash
+npm run start:dev
+```
+
+---
+
+## API Documentation (Swagger)
+Swagger UI is available at:
+
+http://localhost:3000/docs
+
+---
+
+## Authentication Flow
+1. `POST /auth/register` → returns `accessToken`
+2. Click **Authorize** in Swagger and paste the token  
+   (Swagger adds `Bearer` automatically)
+3. `GET /users/me` → returns the current user profile
+
+---
+
+## Prisma
+
+Useful Prisma commands:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npx prisma migrate dev
+npx prisma migrate deploy
+npx prisma generate
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+## Testing
 
-Check out a few resources that may come in handy when working with NestJS:
+### Unit tests
+```bash
+npm test
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+---
 
-## Support
+### E2E tests
+This project uses a **separate database** for e2e tests.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+#### 1) Create `.env.test`
+Create a `.env.test` file at the project root:
 
-## Stay in touch
+```env
+NODE_ENV=test
+PORT=3001
+DATABASE_URL=postgresql://taskflow:taskflow@127.0.0.1:5433/taskflow_test?schema=public
+JWT_ACCESS_SECRET=test_secret
+JWT_ACCESS_EXPIRES_IN=15m
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+> `.env.test` must NOT be committed (it is ignored in `.gitignore`).
 
-## License
+---
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+#### 2) Create the test database
+```bash
+docker exec -it taskflow-db psql -U taskflow -d postgres -c "CREATE DATABASE taskflow_test;"
+```
+
+---
+
+#### 3) Run migrations + e2e tests
+```bash
+npm run test:e2e:all
+```
+
+---
+
+## Scripts
+- `npm run start:dev` – start in watch mode
+- `npm run build` – compile the project
+- `npm run lint` – lint and fix
+- `npm run format` – prettier
+- `npm run test:e2e:all` – run e2e tests
+
+---
+
+## Project Structure
+- `src/auth` – authentication and JWT
+- `src/users` – user endpoints
+- `src/prisma` – Prisma service
+- `prisma/` – schema and migrations
+- `test/` – e2e tests
+
+---
+
+## Notes
+- Conventional Commits are used (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
+- Feature branches (`feature/*`) and PR-style workflow are followed,
+  even as a solo developer.
