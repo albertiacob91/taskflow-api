@@ -12,12 +12,15 @@ import { UsersModule } from './users/users.module';
 
 import { ProjectsModule } from './projects/projects.module';
 
+import { TasksModule } from './tasks/tasks.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuthModule,
     ProjectsModule,
+    TasksModule,
     UsersModule,
   ],
   controllers: [AppController],
