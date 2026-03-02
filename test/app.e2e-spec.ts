@@ -121,4 +121,79 @@ describe('TaskFlow API (e2e)', () => {
 
     expect(list2.body.items.some((p: any) => p.id === projectId)).toBe(false);
   });
+
+  it('tasks -> create -> list (filter by projectId) -> update -> delete', async () => {
+  const email = `e2e_task_${Date.now()}@example.com`;
+
+  // register
+  const register = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({
+      email,
+      password: 'Password123!',
+      name: 'E2E Task User',
+    })
+    .expect(201);
+
+  const token = register.body.accessToken as string;
+
+  // create project (needed for tasks)
+  const createdProject = await request(app.getHttpServer())
+    .post('/projects')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ name: 'Tasks Project', description: 'Project for tasks e2e' })
+    .expect(201);
+
+  const projectId = createdProject.body.id as string;
+
+  // create task
+  const createdTask = await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      title: 'Task 1',
+      description: 'Desc 1',
+      projectId,
+      status: 'TODO',
+      priority: 'MEDIUM',
+    })
+    .expect(201);
+
+  expect(createdTask.body).toHaveProperty('id');
+  const taskId = createdTask.body.id as string;
+
+  // list tasks filtered by projectId (should include)
+  const list = await request(app.getHttpServer())
+    .get(`/tasks?projectId=${projectId}&page=1&limit=10`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(Array.isArray(list.body.items)).toBe(true);
+  expect(list.body.items.some((t: any) => t.id === taskId)).toBe(true);
+
+  // update task
+  const updated = await request(app.getHttpServer())
+    .patch(`/tasks/${taskId}`)
+    .set('Authorization', `Bearer ${token}`)
+    .send({ status: 'IN_PROGRESS' })
+    .expect(200);
+
+  expect(updated.body.status).toBe('IN_PROGRESS');
+
+  // delete task (soft)
+  const deleted = await request(app.getHttpServer())
+    .delete(`/tasks/${taskId}`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(deleted.body).toEqual({ ok: true });
+
+  // list again (should NOT include after soft delete)
+  const list2 = await request(app.getHttpServer())
+    .get(`/tasks?projectId=${projectId}&page=1&limit=10`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(list2.body.items.some((t: any) => t.id === taskId)).toBe(false);
+});
 });
