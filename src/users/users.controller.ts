@@ -1,10 +1,10 @@
 import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
-import { ForbiddenException } from '@nestjs/common'; // si no está
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../common/auth/roles.decorator';
 import { RolesGuard } from '../common/auth/roles.guard';
+import { Role } from '@prisma/client';
 
 @ApiTags('users')
 @Controller('users')
@@ -32,8 +32,9 @@ export class UsersController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  @ApiOkResponse({ description: 'List users (admin only)' })
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({ description: 'List users (ADMIN only)' })
   async listUsers() {
     return this.prisma.user.findMany({
       where: { deletedAt: null },
@@ -45,7 +46,6 @@ export class UsersController {
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
-      take: 50,
     });
   }
 }
