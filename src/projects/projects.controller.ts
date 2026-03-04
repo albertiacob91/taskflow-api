@@ -1,55 +1,84 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AddProjectMemberDto } from './dto/add-project-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectsService } from './projects.service';
 
 @ApiTags('projects')
-@ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard)
 @Controller('projects')
 export class ProjectsController {
   constructor(private readonly projects: ProjectsService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @ApiOkResponse({ description: 'Create project' })
   create(@Req() req: any, @Body() dto: CreateProjectDto) {
     return this.projects.create(req.user.userId, dto);
   }
 
   @Get()
-  @ApiOkResponse({ description: 'List projects (paginated)' })
-  @ApiQuery({ name: 'q', required: false, description: 'Search by name/description' })
-  @ApiQuery({ name: 'page', required: false, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, example: 10 })
-  findAll(
-    @Query('q') q?: string,
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({ description: 'List projects (owner or member)' })
+  list(
+    @Req() req: any,
     @Query('page') page = '1',
     @Query('limit') limit = '10',
   ) {
-    return this.projects.findAll({
-      q,
-      page: Math.max(1, Number(page) || 1),
-      limit: Math.min(50, Math.max(1, Number(limit) || 10)),
-    });
-  }
-
-  @Get(':id')
-  @ApiOkResponse({ description: 'Get project by id' })
-  findOne(@Param('id') id: string) {
-    return this.projects.findById(id);
+    return this.projects.list(req.user.userId, Number(page), Number(limit));
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @ApiOkResponse({ description: 'Update project (owner only)' })
   update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateProjectDto) {
     return this.projects.update(id, req.user.userId, dto);
   }
 
   @Delete(':id')
-  @ApiOkResponse({ description: 'Soft delete project (owner only)' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({ description: 'Delete project (owner only)' })
   remove(@Req() req: any, @Param('id') id: string) {
     return this.projects.remove(id, req.user.userId);
+  }
+
+  @Post(':id/members')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({ description: 'Add member to project (owner only)' })
+  addMember(@Req() req: any, @Param('id') id: string, @Body() dto: AddProjectMemberDto) {
+    return this.projects.addMember(id, req.user.userId, dto);
+  }
+
+  @Get(':id/members')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({ description: 'List members (owner or member)' })
+  listMembers(@Req() req: any, @Param('id') id: string) {
+    return this.projects.listMembers(id, req.user.userId);
+  }
+
+  @Delete(':id/members/:userId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({ description: 'Remove member (owner only)' })
+  removeMember(@Req() req: any, @Param('id') id: string, @Param('userId') userId: string) {
+    return this.projects.removeMember(id, req.user.userId, userId);
   }
 }
