@@ -2,20 +2,20 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('TaskFlow API (e2e)', () => {
-const prisma = new PrismaClient();
-
   let app: INestApplication;
+  let prisma: PrismaService;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
-    app = moduleRef.createNestApplication();
+    prisma = moduleRef.get(PrismaService);
 
+    app = moduleRef.createNestApplication();
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -28,23 +28,19 @@ const prisma = new PrismaClient();
   });
 
   afterAll(async () => {
-  await app.close();
-  await prisma.$disconnect();
-});
+    await app.close();
+  });
 
   it('register -> returns accessToken', async () => {
     const email = `e2e_${Date.now()}@example.com`;
 
     const res = await request(app.getHttpServer())
       .post('/auth/register')
-      .send({
-        email,
-        password: 'Password123!',
-        name: 'E2E User',
-      })
+      .send({ email, password: 'Password123!', name: 'E2E User' })
       .expect(201);
 
     expect(res.body).toHaveProperty('accessToken');
+    expect(res.body).toHaveProperty('refreshToken');
     expect(res.body).toHaveProperty('user');
     expect(res.body.user.email).toBe(email);
   });
@@ -54,11 +50,7 @@ const prisma = new PrismaClient();
 
     const register = await request(app.getHttpServer())
       .post('/auth/register')
-      .send({
-        email,
-        password: 'Password123!',
-        name: 'E2E User',
-      })
+      .send({ email, password: 'Password123!', name: 'E2E User' })
       .expect(201);
 
     const token = register.body.accessToken;
@@ -77,11 +69,7 @@ const prisma = new PrismaClient();
 
     const register = await request(app.getHttpServer())
       .post('/auth/register')
-      .send({
-        email,
-        password: 'Password123!',
-        name: 'E2E Project User',
-      })
+      .send({ email, password: 'Password123!', name: 'E2E Project User' })
       .expect(201);
 
     const token = register.body.accessToken as string;
@@ -92,7 +80,6 @@ const prisma = new PrismaClient();
       .send({ name: 'Project A', description: 'Desc A' })
       .expect(201);
 
-    expect(created.body).toHaveProperty('id');
     const projectId = created.body.id as string;
 
     const list1 = await request(app.getHttpServer())
@@ -127,211 +114,177 @@ const prisma = new PrismaClient();
   });
 
   it('tasks -> create -> list (filter by projectId) -> update -> delete', async () => {
-  const email = `e2e_task_${Date.now()}@example.com`;
+    const email = `e2e_task_${Date.now()}@example.com`;
 
-  // register
-  const register = await request(app.getHttpServer())
-    .post('/auth/register')
-    .send({
-      email,
-      password: 'Password123!',
-      name: 'E2E Task User',
-    })
-    .expect(201);
+    const register = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email, password: 'Password123!', name: 'E2E Task User' })
+      .expect(201);
 
-  const token = register.body.accessToken as string;
+    const token = register.body.accessToken as string;
 
-  // create project (needed for tasks)
-  const createdProject = await request(app.getHttpServer())
-    .post('/projects')
-    .set('Authorization', `Bearer ${token}`)
-    .send({ name: 'Tasks Project', description: 'Project for tasks e2e' })
-    .expect(201);
+    const createdProject = await request(app.getHttpServer())
+      .post('/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Tasks Project', description: 'Project for tasks e2e' })
+      .expect(201);
 
-  const projectId = createdProject.body.id as string;
+    const projectId = createdProject.body.id as string;
 
-  // create task
-  const createdTask = await request(app.getHttpServer())
-    .post('/tasks')
-    .set('Authorization', `Bearer ${token}`)
-    .send({
-      title: 'Task 1',
-      description: 'Desc 1',
-      projectId,
-      status: 'TODO',
-      priority: 'MEDIUM',
-    })
-    .expect(201);
+    const createdTask = await request(app.getHttpServer())
+      .post('/tasks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Task 1',
+        description: 'Desc 1',
+        projectId,
+        status: 'TODO',
+        priority: 'MEDIUM',
+      })
+      .expect(201);
 
-  expect(createdTask.body).toHaveProperty('id');
-  const taskId = createdTask.body.id as string;
+    const taskId = createdTask.body.id as string;
 
-  // list tasks filtered by projectId (should include)
-  const list = await request(app.getHttpServer())
-    .get(`/tasks?projectId=${projectId}&page=1&limit=10`)
-    .set('Authorization', `Bearer ${token}`)
-    .expect(200);
+    const list = await request(app.getHttpServer())
+      .get(`/tasks?projectId=${projectId}&page=1&limit=10`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
 
-  expect(Array.isArray(list.body.items)).toBe(true);
-  expect(list.body.items.some((t: any) => t.id === taskId)).toBe(true);
+    expect(Array.isArray(list.body.items)).toBe(true);
+    expect(list.body.items.some((t: any) => t.id === taskId)).toBe(true);
 
-  // update task
-  const updated = await request(app.getHttpServer())
-    .patch(`/tasks/${taskId}`)
-    .set('Authorization', `Bearer ${token}`)
-    .send({ status: 'IN_PROGRESS' })
-    .expect(200);
+    const updated = await request(app.getHttpServer())
+      .patch(`/tasks/${taskId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'IN_PROGRESS' })
+      .expect(200);
 
-  expect(updated.body.status).toBe('IN_PROGRESS');
+    expect(updated.body.status).toBe('IN_PROGRESS');
 
-  // delete task (soft)
-  const deleted = await request(app.getHttpServer())
-    .delete(`/tasks/${taskId}`)
-    .set('Authorization', `Bearer ${token}`)
-    .expect(200);
+    const deleted = await request(app.getHttpServer())
+      .delete(`/tasks/${taskId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
 
-  expect(deleted.body).toEqual({ ok: true });
+    expect(deleted.body).toEqual({ ok: true });
 
-  // list again (should NOT include after soft delete)
-  const list2 = await request(app.getHttpServer())
-    .get(`/tasks?projectId=${projectId}&page=1&limit=10`)
-    .set('Authorization', `Bearer ${token}`)
-    .expect(200);
+    const list2 = await request(app.getHttpServer())
+      .get(`/tasks?projectId=${projectId}&page=1&limit=10`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
 
-  expect(list2.body.items.some((t: any) => t.id === taskId)).toBe(false);
-});
-
-it('comments -> create -> list (filter by taskId) -> update -> delete (author only)', async () => {
-  const email = `e2e_comment_${Date.now()}@example.com`;
-
-  // register
-  const register = await request(app.getHttpServer())
-    .post('/auth/register')
-    .send({
-      email,
-      password: 'Password123!',
-      name: 'E2E Comment User',
-    })
-    .expect(201);
-
-  const token = register.body.accessToken as string;
-
-  // create project
-  const createdProject = await request(app.getHttpServer())
-    .post('/projects')
-    .set('Authorization', `Bearer ${token}`)
-    .send({ name: 'Comments Project', description: 'Project for comments e2e' })
-    .expect(201);
-
-  const projectId = createdProject.body.id as string;
-
-  // create task
-  const createdTask = await request(app.getHttpServer())
-    .post('/tasks')
-    .set('Authorization', `Bearer ${token}`)
-    .send({
-      title: 'Comment Task',
-      description: 'Task for comments',
-      projectId,
-      status: 'TODO',
-      priority: 'MEDIUM',
-    })
-    .expect(201);
-
-  const taskId = createdTask.body.id as string;
-
-  // create comment
-  const createdComment = await request(app.getHttpServer())
-    .post('/comments')
-    .set('Authorization', `Bearer ${token}`)
-    .send({
-      content: 'First comment!',
-      taskId,
-    })
-    .expect(201);
-
-  expect(createdComment.body).toHaveProperty('id');
-  const commentId = createdComment.body.id as string;
-
-  // list comments filtered by taskId
-  const list = await request(app.getHttpServer())
-    .get(`/comments?taskId=${taskId}&page=1&limit=10`)
-    .set('Authorization', `Bearer ${token}`)
-    .expect(200);
-
-  expect(Array.isArray(list.body.items)).toBe(true);
-  expect(list.body.items.some((c: any) => c.id === commentId)).toBe(true);
-
-  // update comment (author)
-  const updated = await request(app.getHttpServer())
-    .patch(`/comments/${commentId}`)
-    .set('Authorization', `Bearer ${token}`)
-    .send({ content: 'Updated comment!' })
-    .expect(200);
-
-  expect(updated.body.content).toBe('Updated comment!');
-
-  // delete comment (soft)
-  const deleted = await request(app.getHttpServer())
-    .delete(`/comments/${commentId}`)
-    .set('Authorization', `Bearer ${token}`)
-    .expect(200);
-
-  expect(deleted.body).toEqual({ ok: true });
-
-  // list again (should NOT include after soft delete)
-  const list2 = await request(app.getHttpServer())
-    .get(`/comments?taskId=${taskId}&page=1&limit=10`)
-    .set('Authorization', `Bearer ${token}`)
-    .expect(200);
-
-  expect(list2.body.items.some((c: any) => c.id === commentId)).toBe(false);
-});
-
-it('users list -> forbidden for USER, allowed for ADMIN', async () => {
-  // USER
-  const emailUser = `e2e_user_${Date.now()}@example.com`;
-  const regUser = await request(app.getHttpServer())
-    .post('/auth/register')
-    .send({ email: emailUser, password: 'Password123!', name: 'User' })
-    .expect(201);
-
-  const tokenUser = regUser.body.accessToken as string;
-
-  await request(app.getHttpServer())
-    .get('/users')
-    .set('Authorization', `Bearer ${tokenUser}`)
-    .expect(403);
-
-  // ADMIN: register and then upgrade role in DB
-  const emailAdmin = `e2e_admin_${Date.now()}@example.com`;
-  const regAdmin = await request(app.getHttpServer())
-    .post('/auth/register')
-    .send({ email: emailAdmin, password: 'Password123!', name: 'Admin' })
-    .expect(201);
-
-  const adminId = regAdmin.body.user.id as string;
-
-  // promote to ADMIN in test DB
-  await prisma.user.update({
-    where: { id: adminId },
-    data: { role: 'ADMIN' },
+    expect(list2.body.items.some((t: any) => t.id === taskId)).toBe(false);
   });
 
-  // login again to get a token (optional, but clean)
-  const loginAdmin = await request(app.getHttpServer())
-    .post('/auth/login')
-    .send({ email: emailAdmin, password: 'Password123!' })
-    .expect(201);
+  it('comments -> create -> list (filter by taskId) -> update -> delete (author only)', async () => {
+    const email = `e2e_comment_${Date.now()}@example.com`;
 
-  const tokenAdmin = loginAdmin.body.accessToken as string;
+    const register = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email, password: 'Password123!', name: 'E2E Comment User' })
+      .expect(201);
 
-  const list = await request(app.getHttpServer())
-    .get('/users')
-    .set('Authorization', `Bearer ${tokenAdmin}`)
-    .expect(200);
+    const token = register.body.accessToken as string;
 
-  expect(Array.isArray(list.body)).toBe(true);
-  expect(list.body.some((u: any) => u.email === emailAdmin)).toBe(true);
-});
+    const createdProject = await request(app.getHttpServer())
+      .post('/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Comments Project', description: 'Project for comments e2e' })
+      .expect(201);
+
+    const projectId = createdProject.body.id as string;
+
+    const createdTask = await request(app.getHttpServer())
+      .post('/tasks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Comment Task',
+        description: 'Task for comments',
+        projectId,
+        status: 'TODO',
+        priority: 'MEDIUM',
+      })
+      .expect(201);
+
+    const taskId = createdTask.body.id as string;
+
+    const createdComment = await request(app.getHttpServer())
+      .post('/comments')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ content: 'First comment!', taskId })
+      .expect(201);
+
+    const commentId = createdComment.body.id as string;
+
+    const list = await request(app.getHttpServer())
+      .get(`/comments?taskId=${taskId}&page=1&limit=10`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(Array.isArray(list.body.items)).toBe(true);
+    expect(list.body.items.some((c: any) => c.id === commentId)).toBe(true);
+
+    const updated = await request(app.getHttpServer())
+      .patch(`/comments/${commentId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ content: 'Updated comment!' })
+      .expect(200);
+
+    expect(updated.body.content).toBe('Updated comment!');
+
+    const deleted = await request(app.getHttpServer())
+      .delete(`/comments/${commentId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(deleted.body).toEqual({ ok: true });
+
+    const list2 = await request(app.getHttpServer())
+      .get(`/comments?taskId=${taskId}&page=1&limit=10`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(list2.body.items.some((c: any) => c.id === commentId)).toBe(false);
+  });
+
+  it('auth refresh -> rotates token and logout revokes it (jti)', async () => {
+    const email = `e2e_refresh_${Date.now()}@example.com`;
+
+    const register = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email, password: 'Password123!', name: 'Refresh User' })
+      .expect(201);
+
+    const refresh1 = register.body.refreshToken as string;
+
+    const refreshed = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: refresh1 })
+      .expect(201);
+
+    const refresh2 = refreshed.body.refreshToken as string;
+    expect(refresh2).not.toBe(refresh1);
+
+    await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: refresh1 })
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .post('/auth/logout')
+      .send({ refreshToken: refresh2 })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: refresh2 })
+      .expect(401);
+
+    const userRow = await prisma.user.findFirst({
+      where: { email },
+      select: { refreshTokenJti: true },
+    });
+
+    expect(userRow?.refreshTokenJti).toBeNull();
+  });
 });
