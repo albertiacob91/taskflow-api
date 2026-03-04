@@ -1,21 +1,44 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProjectsService } from '../projects/projects.service';
+import { CreateCommentDto } from './dto/create-comment.dto';
+import { UpdateCommentDto } from './dto/update-comment.dto';
 
 @Injectable()
 export class CommentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projects: ProjectsService,
+  ) {}
 
-  async create(userId: string, input: { content: string; taskId: string }) {
-    const task = await this.prisma.task.findFirst({
-      where: { id: input.taskId, deletedAt: null },
-      select: { id: true },
+  private async getCommentOrThrow(commentId: string) {
+    const comment = await this.prisma.comment.findFirst({
+      where: { id: commentId, deletedAt: null },
+      select: { id: true, authorId: true, taskId: true },
     });
+
+    if (!comment) throw new NotFoundException('Comment not found');
+    return comment;
+  }
+
+  private async getTaskProjectIdOrThrow(taskId: string) {
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, deletedAt: null },
+      select: { id: true, projectId: true },
+    });
+
     if (!task) throw new NotFoundException('Task not found');
+    return task.projectId;
+  }
+
+  async create(userId: string, dto: CreateCommentDto) {
+    const projectId = await this.getTaskProjectIdOrThrow(dto.taskId);
+    await this.projects.assertMemberOrOwner(projectId, userId);
 
     return this.prisma.comment.create({
       data: {
-        content: input.content,
-        taskId: input.taskId,
+        content: dto.content,
+        taskId: dto.taskId,
         authorId: userId,
       },
       select: {
@@ -24,84 +47,65 @@ export class CommentsService {
         taskId: true,
         authorId: true,
         createdAt: true,
-        updatedAt: true,
       },
     });
   }
 
-  async findAll(params: { taskId?: string; page: number; limit: number }) {
-    const { taskId, page, limit } = params;
+  async list(
+    userId: string,
+    query: { taskId?: string; page: number; limit: number },
+  ) {
+    const { taskId, page, limit } = query;
+
+    if (!taskId) throw new ForbiddenException('taskId is required');
+
+    const projectId = await this.getTaskProjectIdOrThrow(taskId);
+    await this.projects.assertMemberOrOwner(projectId, userId);
+
     const skip = (page - 1) * limit;
 
-    const where = {
-      deletedAt: null,
-      ...(taskId ? { taskId } : {}),
-    };
+    const where = { deletedAt: null, taskId };
 
     const [items, total] = await Promise.all([
       this.prisma.comment.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
-        select: {
-          id: true,
-          content: true,
-          taskId: true,
-          authorId: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        orderBy: { createdAt: 'desc' },
       }),
       this.prisma.comment.count({ where }),
     ]);
 
-    return {
-      items,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return { items, meta: { page, limit, total } };
   }
 
-  async update(id: string, userId: string, input: { content?: string }) {
-    const existing = await this.prisma.comment.findFirst({
-      where: { id, deletedAt: null },
-      select: { id: true, authorId: true },
-    });
-    if (!existing) throw new NotFoundException('Comment not found');
-    if (existing.authorId !== userId) throw new ForbiddenException('Not allowed');
+  async update(commentId: string, userId: string, dto: UpdateCommentDto) {
+    const comment = await this.getCommentOrThrow(commentId);
+
+    // must be author
+    if (comment.authorId !== userId) throw new ForbiddenException('Only author allowed');
+
+    const projectId = await this.getTaskProjectIdOrThrow(comment.taskId);
+    await this.projects.assertMemberOrOwner(projectId, userId);
 
     return this.prisma.comment.update({
-      where: { id },
-      data: {
-        ...(input.content !== undefined ? { content: input.content } : {}),
-      },
-      select: {
-        id: true,
-        content: true,
-        taskId: true,
-        authorId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      where: { id: commentId },
+      data: { content: dto.content },
     });
   }
 
-  async remove(id: string, userId: string) {
-    const existing = await this.prisma.comment.findFirst({
-      where: { id, deletedAt: null },
-      select: { id: true, authorId: true },
-    });
-    if (!existing) throw new NotFoundException('Comment not found');
-    if (existing.authorId !== userId) throw new ForbiddenException('Not allowed');
+  async remove(commentId: string, userId: string) {
+    const comment = await this.getCommentOrThrow(commentId);
+
+    if (comment.authorId !== userId) throw new ForbiddenException('Only author allowed');
+
+    const projectId = await this.getTaskProjectIdOrThrow(comment.taskId);
+    await this.projects.assertMemberOrOwner(projectId, userId);
 
     await this.prisma.comment.update({
-      where: { id },
+      where: { id: commentId },
       data: { deletedAt: new Date() },
+      select: { id: true },
     });
 
     return { ok: true };
