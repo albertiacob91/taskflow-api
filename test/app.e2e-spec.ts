@@ -334,4 +334,87 @@ describe('TaskFlow API (e2e)', () => {
   expect(Array.isArray(list.body)).toBe(true);
   expect(list.body.some((u: any) => u.email === emailAdmin)).toBe(true);
 });
+
+it('projects members -> owner can add/remove, member can view, outsider forbidden', async () => {
+  // owner
+  const ownerEmail = `e2e_owner_${Date.now()}@example.com`;
+  const ownerReg = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: ownerEmail, password: 'Password123!', name: 'Owner' })
+    .expect(201);
+
+  const ownerToken = ownerReg.body.accessToken as string;
+
+  // member
+  const memberEmail = `e2e_member_${Date.now()}@example.com`;
+  const memberReg = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: memberEmail, password: 'Password123!', name: 'Member' })
+    .expect(201);
+
+  const memberToken = memberReg.body.accessToken as string;
+  const memberId = memberReg.body.user.id as string;
+
+  // outsider
+  const outsiderEmail = `e2e_out_${Date.now()}@example.com`;
+  const outsiderReg = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: outsiderEmail, password: 'Password123!', name: 'Outsider' })
+    .expect(201);
+
+  const outsiderToken = outsiderReg.body.accessToken as string;
+
+  // create project (owner)
+  const project = await request(app.getHttpServer())
+    .post('/projects')
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .send({ name: 'Members Project', description: 'Project members e2e' })
+    .expect(201);
+
+  const projectId = project.body.id as string;
+
+  // owner adds member by email
+  await request(app.getHttpServer())
+    .post(`/projects/${projectId}/members`)
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .send({ email: memberEmail })
+    .expect(201);
+
+  // member can list members
+  const listAsMember = await request(app.getHttpServer())
+    .get(`/projects/${projectId}/members`)
+    .set('Authorization', `Bearer ${memberToken}`)
+    .expect(200);
+
+  expect(listAsMember.body).toHaveProperty('owner');
+  expect(Array.isArray(listAsMember.body.members)).toBe(true);
+  expect(listAsMember.body.members.some((u: any) => u.email === memberEmail)).toBe(true);
+
+  // outsider forbidden
+  await request(app.getHttpServer())
+    .get(`/projects/${projectId}/members`)
+    .set('Authorization', `Bearer ${outsiderToken}`)
+    .expect(403);
+
+  // owner removes member
+  await request(app.getHttpServer())
+    .delete(`/projects/${projectId}/members/${memberId}`)
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .expect(200);
+
+  // member now forbidden
+  await request(app.getHttpServer())
+    .get(`/projects/${projectId}/members`)
+    .set('Authorization', `Bearer ${memberToken}`)
+    .expect(403);
+
+  // member should see project in /projects before removal, and not after removal
+  // (after removal, /projects list should not include it)
+  const listProjectsAfter = await request(app.getHttpServer())
+    .get('/projects?page=1&limit=50')
+    .set('Authorization', `Bearer ${memberToken}`)
+    .expect(200);
+
+  expect(listProjectsAfter.body.items.some((p: any) => p.id === projectId)).toBe(false);
+});
 });
