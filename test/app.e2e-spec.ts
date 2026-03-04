@@ -27,9 +27,9 @@ describe('TaskFlow API (e2e)', () => {
     await app.init();
   });
 
-  afterAll(async () => {
-    await app.close();
-  });
+afterAll(async () => {
+  await app?.close();
+});
 
   it('register -> returns accessToken', async () => {
     const email = `e2e_${Date.now()}@example.com`;
@@ -416,5 +416,58 @@ it('projects members -> owner can add/remove, member can view, outsider forbidde
     .expect(200);
 
   expect(listProjectsAfter.body.items.some((p: any) => p.id === projectId)).toBe(false);
+});
+it('permissions -> outsider cannot access tasks/comments of a project', async () => {
+  // owner creates project and task
+  const ownerEmail = `e2e_perm_owner_${Date.now()}@example.com`;
+  const ownerReg = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: ownerEmail, password: 'Password123!', name: 'Owner' })
+    .expect(201);
+
+  const ownerToken = ownerReg.body.accessToken as string;
+
+  const outsiderEmail = `e2e_perm_out_${Date.now()}@example.com`;
+  const outsiderReg = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: outsiderEmail, password: 'Password123!', name: 'Outsider' })
+    .expect(201);
+
+  const outsiderToken = outsiderReg.body.accessToken as string;
+
+  const project = await request(app.getHttpServer())
+    .post('/projects')
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .send({ name: 'Perm Project', description: 'perm e2e' })
+    .expect(201);
+
+  const projectId = project.body.id as string;
+
+  const task = await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .send({ title: 'Perm Task', projectId, status: 'TODO', priority: 'MEDIUM' })
+    .expect(201);
+
+  const taskId = task.body.id as string;
+
+  // outsider cannot list tasks
+  await request(app.getHttpServer())
+    .get(`/tasks?projectId=${projectId}&page=1&limit=10`)
+    .set('Authorization', `Bearer ${outsiderToken}`)
+    .expect(403);
+
+  // outsider cannot create comment
+  await request(app.getHttpServer())
+    .post('/comments')
+    .set('Authorization', `Bearer ${outsiderToken}`)
+    .send({ content: 'nope', taskId })
+    .expect(403);
+
+  // outsider cannot list comments
+  await request(app.getHttpServer())
+    .get(`/comments?taskId=${taskId}&page=1&limit=10`)
+    .set('Authorization', `Bearer ${outsiderToken}`)
+    .expect(403);
 });
 });
