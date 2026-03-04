@@ -287,4 +287,51 @@ describe('TaskFlow API (e2e)', () => {
 
     expect(userRow?.refreshTokenJti).toBeNull();
   });
+
+  it('users list -> forbidden for USER, allowed for ADMIN', async () => {
+  // USER
+  const emailUser = `e2e_user_${Date.now()}@example.com`;
+  const regUser = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: emailUser, password: 'Password123!', name: 'User' })
+    .expect(201);
+
+  const tokenUser = regUser.body.accessToken as string;
+
+  await request(app.getHttpServer())
+    .get('/users')
+    .set('Authorization', `Bearer ${tokenUser}`)
+    .expect(403);
+
+  // ADMIN
+  const emailAdmin = `e2e_admin_${Date.now()}@example.com`;
+  const regAdmin = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: emailAdmin, password: 'Password123!', name: 'Admin' })
+    .expect(201);
+
+  const adminId = regAdmin.body.user.id as string;
+
+  // promote in DB
+  await prisma.user.update({
+    where: { id: adminId },
+    data: { role: 'ADMIN' },
+  });
+
+  // login to get a fresh token (optional, but clear)
+  const loginAdmin = await request(app.getHttpServer())
+    .post('/auth/login')
+    .send({ email: emailAdmin, password: 'Password123!' })
+    .expect(201);
+
+  const tokenAdmin = loginAdmin.body.accessToken as string;
+
+  const list = await request(app.getHttpServer())
+    .get('/users')
+    .set('Authorization', `Bearer ${tokenAdmin}`)
+    .expect(200);
+
+  expect(Array.isArray(list.body)).toBe(true);
+  expect(list.body.some((u: any) => u.email === emailAdmin)).toBe(true);
+});
 });
