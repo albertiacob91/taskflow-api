@@ -640,4 +640,13 @@ it('tasks list -> supports assignedTo=me and createdBy=me filters', async () => 
   expect(listCreatedByMe.body.items.some((t: any) => t.id === taskA.body.id)).toBe(true);
   expect(listCreatedByMe.body.items.some((t: any) => t.id === taskB.body.id)).toBe(true);
 });
+
+it('health -> returns ok and sets x-request-id header', async () => {
+  const res = await request(app.getHttpServer())
+    .get('/health')
+    .expect(200);
+
+  expect(res.body).toEqual({ ok: true });
+  expect(res.headers).toHaveProperty('x-request-id');
+});
 });
