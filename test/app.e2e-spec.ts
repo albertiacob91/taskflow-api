@@ -577,4 +577,67 @@ it('tasks list -> supports filters/search/sort/dueDate range', async () => {
   // keep strict
   expect(t3.body.id).toBeTruthy();
 });
+
+it('tasks list -> supports assignedTo=me and createdBy=me filters', async () => {
+  const email = `e2e_assign_${Date.now()}@example.com`;
+
+  const register = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email, password: 'Password123!', name: 'Assign User' })
+    .expect(201);
+
+  const token = register.body.accessToken as string;
+  const userId = register.body.user.id as string;
+
+  const project = await request(app.getHttpServer())
+    .post('/projects')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ name: 'Assign Project', description: 'Project for assignment filters' })
+    .expect(201);
+
+  const projectId = project.body.id as string;
+
+  // Task A: createdBy=me, assignedTo=me
+  const taskA = await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      title: 'Assigned to me',
+      projectId,
+      assignedToId: userId,
+      status: 'TODO',
+      priority: 'MEDIUM',
+    })
+    .expect(201);
+
+  // Task B: createdBy=me, assignedTo=null
+  const taskB = await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      title: 'Not assigned',
+      projectId,
+      status: 'TODO',
+      priority: 'MEDIUM',
+    })
+    .expect(201);
+
+  // 1) assignedTo=me should include taskA and exclude taskB
+  const listAssignedToMe = await request(app.getHttpServer())
+    .get(`/tasks?projectId=${projectId}&assignedTo=me&page=1&limit=10`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(listAssignedToMe.body.items.some((t: any) => t.id === taskA.body.id)).toBe(true);
+  expect(listAssignedToMe.body.items.some((t: any) => t.id === taskB.body.id)).toBe(false);
+
+  // 2) createdBy=me should include both taskA and taskB
+  const listCreatedByMe = await request(app.getHttpServer())
+    .get(`/tasks?projectId=${projectId}&createdBy=me&page=1&limit=10`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(listCreatedByMe.body.items.some((t: any) => t.id === taskA.body.id)).toBe(true);
+  expect(listCreatedByMe.body.items.some((t: any) => t.id === taskB.body.id)).toBe(true);
+});
 });
