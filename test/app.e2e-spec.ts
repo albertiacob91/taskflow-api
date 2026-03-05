@@ -470,4 +470,111 @@ it('permissions -> outsider cannot access tasks/comments of a project', async ()
     .set('Authorization', `Bearer ${outsiderToken}`)
     .expect(403);
 });
+
+it('tasks list -> supports filters/search/sort/dueDate range', async () => {
+  const email = `e2e_query_${Date.now()}@example.com`;
+
+  const register = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email, password: 'Password123!', name: 'Query User' })
+    .expect(201);
+
+  const token = register.body.accessToken as string;
+
+  // create project
+  const createdProject = await request(app.getHttpServer())
+    .post('/projects')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ name: 'Query Project', description: 'Project for query tests' })
+    .expect(201);
+
+  const projectId = createdProject.body.id as string;
+
+  // create tasks with dueDate
+  const due1 = new Date(Date.now() + 24 * 3600 * 1000).toISOString(); // +1 day
+  const due2 = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(); // +7 days
+
+  const t1 = await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      title: 'Fix login bug',
+      description: 'auth module bug',
+      projectId,
+      status: 'TODO',
+      priority: 'HIGH',
+      dueDate: due1,
+    })
+    .expect(201);
+
+  const t2 = await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      title: 'Write docs',
+      description: 'README improvements',
+      projectId,
+      status: 'IN_PROGRESS',
+      priority: 'LOW',
+      dueDate: due2,
+    })
+    .expect(201);
+
+  const t3 = await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      title: 'Refactor tasks',
+      description: 'cleanup and refactor',
+      projectId,
+      status: 'DONE',
+      priority: 'MEDIUM',
+    })
+    .expect(201);
+
+  // 1) filter by status
+  const listTodo = await request(app.getHttpServer())
+    .get(`/tasks?projectId=${projectId}&status=TODO&page=1&limit=10`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(listTodo.body.items.some((x: any) => x.id === t1.body.id)).toBe(true);
+  expect(listTodo.body.items.some((x: any) => x.id === t2.body.id)).toBe(false);
+
+  // 2) search in title/description
+  const listSearch = await request(app.getHttpServer())
+    .get(`/tasks?projectId=${projectId}&search=auth&page=1&limit=10`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(listSearch.body.items.some((x: any) => x.id === t1.body.id)).toBe(true);
+  expect(listSearch.body.items.some((x: any) => x.id === t2.body.id)).toBe(false);
+
+  // 3) dueDate range (include t1, exclude t2)
+  const dueFrom = new Date(Date.now()).toISOString();
+  const dueTo = new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString(); // +2 days
+
+  const listDue = await request(app.getHttpServer())
+    .get(
+      `/tasks?projectId=${projectId}&dueFrom=${encodeURIComponent(
+        dueFrom,
+      )}&dueTo=${encodeURIComponent(dueTo)}&page=1&limit=10`,
+    )
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(listDue.body.items.some((x: any) => x.id === t1.body.id)).toBe(true);
+  expect(listDue.body.items.some((x: any) => x.id === t2.body.id)).toBe(false);
+
+  // 4) sorting createdAt asc (t1 should be first because we created in order)
+  const listSort = await request(app.getHttpServer())
+    .get(`/tasks?projectId=${projectId}&sortBy=createdAt&order=asc&page=1&limit=10`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(listSort.body.items[0].id).toBe(t1.body.id);
+
+  // keep strict
+  expect(t3.body.id).toBeTruthy();
+});
 });
