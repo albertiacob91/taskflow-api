@@ -53,67 +53,75 @@ export class TasksService {
   }
 
   async list(userId: string, query: QueryTasksDto) {
-    // QueryTasksDto ya valida projectId como required, pero mantenemos guardrail:
-    if (!query.projectId) throw new ForbiddenException('projectId is required');
+  if (!query.projectId) throw new ForbiddenException('projectId is required');
 
-    await this.projects.assertMemberOrOwner(query.projectId, userId);
+  await this.projects.assertMemberOrOwner(query.projectId, userId);
 
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 10;
-    const skip = (page - 1) * limit;
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 10;
+  const skip = (page - 1) * limit;
 
-    const where: any = {
-      deletedAt: null,
-      projectId: query.projectId,
-    };
+  const where: any = {
+    deletedAt: null,
+    projectId: query.projectId,
+  };
 
-    if (query.status) where.status = query.status;
-    if (query.priority) where.priority = query.priority;
-    if (query.assignedToId) where.assignedToId = query.assignedToId;
+  if (query.status) where.status = query.status;
+  if (query.priority) where.priority = query.priority;
 
-    if (query.dueFrom || query.dueTo) {
-      where.dueDate = {};
-      if (query.dueFrom) where.dueDate.gte = new Date(query.dueFrom);
-      if (query.dueTo) where.dueDate.lte = new Date(query.dueTo);
-    }
-
-    if (query.search?.trim()) {
-      const s = query.search.trim();
-      where.OR = [
-        { title: { contains: s, mode: 'insensitive' } },
-        { description: { contains: s, mode: 'insensitive' } },
-      ];
-    }
-
-    const orderBy: any = {
-      [query.sortBy ?? 'createdAt']: query.order ?? 'desc',
-    };
-
-    const [items, total] = await Promise.all([
-      this.prisma.task.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          status: true,
-          priority: true,
-          dueDate: true,
-          projectId: true,
-          createdById: true,
-          assignedToId: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
-      this.prisma.task.count({ where }),
-    ]);
-
-    return { items, meta: { page, limit, total } };
+  // assignedTo: "me" or uuid
+  if (query.assignedTo) {
+    where.assignedToId = query.assignedTo === 'me' ? userId : query.assignedTo;
   }
+
+  // createdBy: "me" or uuid
+  if (query.createdBy) {
+    where.createdById = query.createdBy === 'me' ? userId : query.createdBy;
+  }
+
+  if (query.dueFrom || query.dueTo) {
+    where.dueDate = {};
+    if (query.dueFrom) where.dueDate.gte = new Date(query.dueFrom);
+    if (query.dueTo) where.dueDate.lte = new Date(query.dueTo);
+  }
+
+  if (query.search?.trim()) {
+    const s = query.search.trim();
+    where.OR = [
+      { title: { contains: s, mode: 'insensitive' } },
+      { description: { contains: s, mode: 'insensitive' } },
+    ];
+  }
+
+  const orderBy: any = {
+    [query.sortBy ?? 'createdAt']: query.order ?? 'desc',
+  };
+
+  const [items, total] = await Promise.all([
+    this.prisma.task.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        dueDate: true,
+        projectId: true,
+        createdById: true,
+        assignedToId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
+    this.prisma.task.count({ where }),
+  ]);
+
+  return { items, meta: { page, limit, total } };
+}
 
   async update(taskId: string, userId: string, dto: UpdateTaskDto) {
     const task = await this.getTaskOrThrow(taskId);

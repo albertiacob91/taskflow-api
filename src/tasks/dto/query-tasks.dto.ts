@@ -24,6 +24,10 @@ export enum SortOrder {
   desc = 'desc',
 }
 
+export enum UserFilter {
+  me = 'me',
+}
+
 const toInt = ({ value }: { value: any }) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : value;
@@ -44,10 +48,21 @@ export class QueryTasksDto {
   @IsEnum(['LOW', 'MEDIUM', 'HIGH'] as const)
   priority?: 'LOW' | 'MEDIUM' | 'HIGH';
 
-  @ApiPropertyOptional({ format: 'uuid', description: 'Assigned userId' })
+  @ApiPropertyOptional({
+    description: 'Assigned to filter. Use "me" or a userId (uuid).',
+    example: 'me',
+  })
   @IsOptional()
-  @IsUUID()
-  assignedToId?: string;
+  @IsString()
+  assignedTo?: string; // "me" | uuid
+
+  @ApiPropertyOptional({
+    description: 'Created by filter. Use "me" or a userId (uuid).',
+    example: 'me',
+  })
+  @IsOptional()
+  @IsString()
+  createdBy?: string; // "me" | uuid
 
   @ApiPropertyOptional({ description: 'Due date from (ISO)' })
   @IsOptional()
