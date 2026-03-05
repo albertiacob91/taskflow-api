@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { QueryTasksDto } from './dto/query-tasks.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
 @Injectable()
@@ -46,44 +47,67 @@ export class TasksService {
         createdById: true,
         assignedToId: true,
         createdAt: true,
+        updatedAt: true,
       },
     });
   }
 
-  async list(
-    userId: string,
-    query: {
-      projectId?: string;
-      status?: string;
-      priority?: string;
-      page: number;
-      limit: number;
-    },
-  ) {
-    const { projectId, status, priority, page, limit } = query;
+  async list(userId: string, query: QueryTasksDto) {
+    // QueryTasksDto ya valida projectId como required, pero mantenemos guardrail:
+    if (!query.projectId) throw new ForbiddenException('projectId is required');
 
-    if (!projectId) {
-      throw new ForbiddenException('projectId is required');
-    }
+    await this.projects.assertMemberOrOwner(query.projectId, userId);
 
-    await this.projects.assertMemberOrOwner(projectId, userId);
-
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
 
     const where: any = {
       deletedAt: null,
-      projectId,
+      projectId: query.projectId,
     };
 
-    if (status) where.status = status;
-    if (priority) where.priority = priority;
+    if (query.status) where.status = query.status;
+    if (query.priority) where.priority = query.priority;
+    if (query.assignedToId) where.assignedToId = query.assignedToId;
+
+    if (query.dueFrom || query.dueTo) {
+      where.dueDate = {};
+      if (query.dueFrom) where.dueDate.gte = new Date(query.dueFrom);
+      if (query.dueTo) where.dueDate.lte = new Date(query.dueTo);
+    }
+
+    if (query.search?.trim()) {
+      const s = query.search.trim();
+      where.OR = [
+        { title: { contains: s, mode: 'insensitive' } },
+        { description: { contains: s, mode: 'insensitive' } },
+      ];
+    }
+
+    const orderBy: any = {
+      [query.sortBy ?? 'createdAt']: query.order ?? 'desc',
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.task.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          priority: true,
+          dueDate: true,
+          projectId: true,
+          createdById: true,
+          assignedToId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       }),
       this.prisma.task.count({ where }),
     ]);

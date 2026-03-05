@@ -13,6 +13,7 @@ import {
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { QueryTasksDto } from './dto/query-tasks.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TasksService } from './tasks.service';
 
@@ -32,22 +33,11 @@ export class TasksController {
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')
-  @ApiOkResponse({ description: 'List tasks (member or owner). Requires projectId.' })
-  list(
-    @Req() req: any,
-    @Query('projectId') projectId?: string,
-    @Query('status') status?: string,
-    @Query('priority') priority?: string,
-    @Query('page') page = '1',
-    @Query('limit') limit = '10',
-  ) {
-    return this.tasks.list(req.user.userId, {
-      projectId,
-      status,
-      priority,
-      page: Number(page),
-      limit: Number(limit),
-    });
+  @ApiOkResponse({
+    description: 'List tasks with filters/search/sort (member or owner). projectId required.',
+  })
+  list(@Req() req: any, @Query() query: QueryTasksDto) {
+    return this.tasks.list(req.user.userId, query);
   }
 
   @Patch(':id')
