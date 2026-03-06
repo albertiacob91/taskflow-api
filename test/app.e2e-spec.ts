@@ -942,4 +942,91 @@ it('notifications -> task assigned and comment added', async () => {
     .set('Authorization', `Bearer ${ownerToken}`)
     .expect(200);
 });
+
+it('project roles -> viewer can read but cannot write', async () => {
+  const ownerEmail = `e2e_viewer_owner_${Date.now()}@example.com`;
+  const ownerReg = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: ownerEmail, password: 'Password123!', name: 'Owner' })
+    .expect(201);
+
+  const ownerToken = ownerReg.body.accessToken as string;
+
+  const viewerEmail = `e2e_viewer_${Date.now()}@example.com`;
+  const viewerReg = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: viewerEmail, password: 'Password123!', name: 'Viewer' })
+    .expect(201);
+
+  const viewerToken = viewerReg.body.accessToken as string;
+
+  const project = await request(app.getHttpServer())
+    .post('/projects')
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .send({ name: 'Viewer Project', description: 'viewer role test' })
+    .expect(201);
+
+  const projectId = project.body.id as string;
+
+  await request(app.getHttpServer())
+    .post(`/projects/${projectId}/members`)
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .send({ email: viewerEmail, role: 'VIEWER' })
+    .expect(201);
+
+  // viewer can list projects
+  const listProjects = await request(app.getHttpServer())
+    .get('/projects?page=1&limit=20')
+    .set('Authorization', `Bearer ${viewerToken}`)
+    .expect(200);
+
+  expect(listProjects.body.items.some((p: any) => p.id === projectId)).toBe(true);
+
+  // owner creates task
+  const task = await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .send({
+      title: 'Viewer Visible Task',
+      projectId,
+      status: 'TODO',
+      priority: 'MEDIUM',
+    })
+    .expect(201);
+
+  const taskId = task.body.id as string;
+
+  // viewer can read tasks
+  const listTasks = await request(app.getHttpServer())
+    .get(`/tasks?projectId=${projectId}&page=1&limit=20`)
+    .set('Authorization', `Bearer ${viewerToken}`)
+    .expect(200);
+
+  expect(listTasks.body.items.some((t: any) => t.id === taskId)).toBe(true);
+
+  // viewer cannot create task
+  await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${viewerToken}`)
+    .send({
+      title: 'Viewer Cannot Create',
+      projectId,
+      status: 'TODO',
+      priority: 'MEDIUM',
+    })
+    .expect(403);
+
+  // viewer cannot comment
+  await request(app.getHttpServer())
+    .post('/comments')
+    .set('Authorization', `Bearer ${viewerToken}`)
+    .send({ content: 'No write', taskId })
+    .expect(403);
+
+  // viewer can read members
+  await request(app.getHttpServer())
+    .get(`/projects/${projectId}/members`)
+    .set('Authorization', `Bearer ${viewerToken}`)
+    .expect(200);
+});
 });
