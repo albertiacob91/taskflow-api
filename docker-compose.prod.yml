@@ -1,0 +1,38 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16
+    container_name: taskflow-db-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: taskflow
+      POSTGRES_PASSWORD: taskflow
+      POSTGRES_DB: taskflow
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow-api-prod
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://taskflow:taskflow@db:5432/taskflow?schema=public
+      JWT_ACCESS_SECRET: prod_access_secret_change_me
+      JWT_REFRESH_SECRET: prod_refresh_secret_change_me
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./uploads:/app/uploads
+
+volumes:
+  postgres_prod_data:
