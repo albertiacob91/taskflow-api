@@ -19,7 +19,10 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e:prepare": "dotenv -e .env.test -- npx prisma migrate deploy",
     "test:e2e": "dotenv -e .env.test -- jest --config ./test/jest-e2e.json",
-    "test:e2e:all": "npm run test:e2e:prepare && npm run test:e2e"
+    "test:e2e:all": "npm run test:e2e:prepare && npm run test:e2e",
+    "db:seed": "ts-node prisma/seed.ts",
+    "docker:prod": "docker compose -f docker-compose.prod.yml up --build",
+    "docker:prod:down": "docker compose -f docker-compose.prod.yml down"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -88,5 +91,8 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }
