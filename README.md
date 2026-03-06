@@ -1,5 +1,13 @@
 # TaskFlow API
 
+![CI](https://github.com/albertiacob91/taskflow-api/actions/workflows/ci.yml/badge.svg)
+![Node](https://img.shields.io/badge/node-22.x-green)
+![NestJS](https://img.shields.io/badge/NestJS-11-red)
+![Prisma](https://img.shields.io/badge/Prisma-5.x-blue)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED)
+![License](https://img.shields.io/badge/license-UNLICENSED-lightgrey)
+
 Backend API for a **project and task management system** inspired by tools like **Linear / Jira / ClickUp**.
 
 This project demonstrates a **production-ready backend architecture** using **NestJS**, **Prisma**, and **PostgreSQL**, including authentication, permissions, activity logs, real-time notifications, testing, and Docker deployment.
