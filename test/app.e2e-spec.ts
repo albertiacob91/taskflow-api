@@ -676,6 +676,80 @@ it('auth login -> rate limit returns 429 after too many requests', async () => {
   expect(lastStatus).toBe(429);
 });
 
+it('activity api -> supports my activity and admin user activity', async () => {
+  const email = `e2e_activity_api_${Date.now()}@example.com`;
+
+  const register = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email, password: 'Password123!', name: 'Activity API User' })
+    .expect(201);
+
+  const token = register.body.accessToken as string;
+  const userId = register.body.user.id as string;
+
+  const project = await request(app.getHttpServer())
+    .post('/projects')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ name: 'Activity API Project', description: 'activity api test' })
+    .expect(201);
+
+  const projectId = project.body.id as string;
+
+  await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      title: 'Activity API Task',
+      projectId,
+      status: 'TODO',
+      priority: 'MEDIUM',
+    })
+    .expect(201);
+
+  const myActivity = await request(app.getHttpServer())
+    .get('/activity?page=1&limit=20')
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(Array.isArray(myActivity.body.items)).toBe(true);
+  expect(myActivity.body.items.some((x: any) => x.actorId === userId)).toBe(true);
+
+  const adminEmail = `e2e_activity_admin_${Date.now()}@example.com`;
+  const regAdmin = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: adminEmail, password: 'Password123!', name: 'Admin' })
+    .expect(201);
+
+  const adminId = regAdmin.body.user.id as string;
+
+  await prisma.user.update({
+    where: { id: adminId },
+    data: { role: 'ADMIN' },
+  });
+
+  const adminToken = regAdmin.body.accessToken as string;
+
+  const userActivity = await request(app.getHttpServer())
+    .get(`/users/${userId}/activity?page=1&limit=20`)
+    .set('Authorization', `Bearer ${adminToken}`)
+    .expect(200);
+
+  expect(Array.isArray(userActivity.body.items)).toBe(true);
+  expect(userActivity.body.items.some((x: any) => x.actorId === userId)).toBe(true);
+
+  await request(app.getHttpServer())
+    .get(`/users/${userId}/activity?page=1&limit=20`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(403);
+
+  const projectActivity = await request(app.getHttpServer())
+    .get(`/projects/${projectId}/activity?page=1&limit=20`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(Array.isArray(projectActivity.body.items)).toBe(true);
+});
+
 it('project activity -> returns logs for project actions', async () => {
   const email = `e2e_activity_${Date.now()}@example.com`;
 
