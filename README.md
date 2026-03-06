@@ -1,166 +1,391 @@
 # TaskFlow API
 
-TaskFlow is a REST API for project and task management built with **NestJS**.
-It includes **JWT authentication**, **Swagger documentation** and **end-to-end tests**.
+Backend API for a **project and task management system** inspired by tools like **Linear / Jira / ClickUp**.
 
-This project is designed as a **portfolio backend project**, following real-world practices
-(branching strategy, migrations, authentication, testing).
+This project demonstrates a **production-ready backend architecture** using **NestJS**, **Prisma**, and **PostgreSQL**, including authentication, permissions, activity logs, real-time notifications, testing, and Docker deployment.
 
 ---
 
-## Tech Stack
-- Node.js + TypeScript
-- NestJS
-- PostgreSQL (Docker)
-- Prisma ORM + migrations
-- JWT authentication
-- Swagger / OpenAPI
-- Jest + Supertest (e2e tests)
+# Features
+
+### Authentication & Security
+
+* JWT authentication
+* Refresh token rotation
+* Secure logout
+* Rate limiting
+* Role-based access control
+
+### Project Management
+
+* Create, update, delete projects
+* Project membership system
+* Role system:
+
+  * OWNER
+  * MEMBER
+  * VIEWER
+* Permissions enforcement
+
+### Tasks
+
+* Create, update, delete tasks
+* Assign tasks to users
+* Status and priority system
+* Advanced filters:
+
+  * search
+  * sorting
+  * due date range
+  * assignedTo / createdBy
+
+### Comments
+
+* Comment on tasks
+* Edit/delete by author
+* Activity tracking
+
+### Attachments
+
+* Upload files to tasks
+* List attachments
+* Delete attachments
+
+### Notifications
+
+* Task assignment notifications
+* Comment notifications
+* WebSocket realtime updates
+
+### Activity Log
+
+Track system activity:
+
+* Project created/updated/deleted
+* Task created/updated/deleted
+* Comment actions
+* Member changes
+
+### Observability
+
+* Request ID middleware
+* Request logging
+* Health check endpoint
+
+### Testing
+
+Comprehensive **end-to-end testing** with Jest and Supertest.
+
+Coverage includes:
+
+* authentication
+* permissions
+* projects
+* tasks
+* comments
+* notifications
+* attachments
+* activity logs
+
+### DevOps
+
+* Docker production build
+* Docker Compose environment
+* Prisma migrations
+* Seed script
+* GitHub Actions CI
 
 ---
 
-## Requirements
-- Node.js (recommended: LTS)
-- Docker & Docker Compose
-- Git
+# Tech Stack
+
+Backend framework
+
+* NestJS
+
+Database
+
+* PostgreSQL
+* Prisma ORM
+
+Authentication
+
+* JWT
+* Passport
+
+Validation
+
+* class-validator
+* class-transformer
+
+Realtime
+
+* Socket.IO
+
+Testing
+
+* Jest
+* Supertest
+
+Infrastructure
+
+* Docker
+* Docker Compose
+
+Documentation
+
+* Swagger (OpenAPI)
 
 ---
 
-## Quick Start
+## System Architecture
 
-### 1) Install dependencies
-```bash
+```mermaid
+graph TD
+
+Client[Client / Frontend]
+
+API[NestJS API]
+
+Auth[Auth Module]
+Users[Users Module]
+Projects[Projects Module]
+Tasks[Tasks Module]
+Comments[Comments Module]
+Attachments[Attachments Module]
+Notifications[Notifications Module]
+Activity[Activity Log]
+
+Prisma[Prisma ORM]
+DB[(PostgreSQL Database)]
+
+Client --> API
+
+API --> Auth
+API --> Users
+API --> Projects
+API --> Tasks
+API --> Comments
+API --> Attachments
+API --> Notifications
+API --> Activity
+
+Auth --> Prisma
+Users --> Prisma
+Projects --> Prisma
+Tasks --> Prisma
+Comments --> Prisma
+Attachments --> Prisma
+Activity --> Prisma
+
+Prisma --> DB
+
+# Project Structure
+
+```
+src/
+ ├── auth
+ ├── users
+ ├── projects
+ ├── tasks
+ ├── comments
+ ├── attachments
+ ├── notifications
+ ├── activity
+ ├── health
+ ├── prisma
+ └── common
+```
+
+---
+
+# API Documentation
+
+Swagger UI:
+
+```
+http://localhost:3001/docs
+```
+
+Example endpoints:
+
+```
+POST /auth/register
+POST /auth/login
+GET  /users/me
+
+POST /projects
+GET  /projects
+PATCH /projects/:id
+
+POST /tasks
+GET  /tasks
+PATCH /tasks/:id
+
+POST /comments
+GET  /comments
+
+POST /attachments
+GET  /notifications
+```
+
+---
+
+# Running the Project
+
+## Install dependencies
+
+```
 npm install
 ```
 
 ---
 
-### 2) Start PostgreSQL with Docker
-```bash
-docker compose up -d
-docker ps
+# Running with Docker (recommended)
+
+Start production environment:
+
+```
+npm run docker:prod
 ```
 
-The database is exposed on `127.0.0.1:5433`
-(see `docker-compose.yml`).
+API will be available at:
 
----
-
-### 3) Configure environment variables
-Create a `.env` file from the example:
-
-```bash
-cp .env.example .env
+```
+http://localhost:3001
 ```
 
-Required variables:
-- `DATABASE_URL`
-- `JWT_ACCESS_SECRET`
-- `JWT_ACCESS_EXPIRES_IN`
+Swagger:
 
----
+```
+http://localhost:3001/docs
+```
 
-### 4) Run database migrations
-```bash
-npx prisma migrate dev
+Health check:
+
+```
+http://localhost:3001/health
 ```
 
 ---
 
-### 5) Start the API
-```bash
-npm run start:dev
+# Database
+
+The project uses **Prisma migrations**.
+
+Apply migrations:
+
 ```
-
----
-
-## API Documentation (Swagger)
-Swagger UI is available at:
-
-http://localhost:3000/docs
-
----
-
-## Authentication Flow
-1. `POST /auth/register` → returns `accessToken`
-2. Click **Authorize** in Swagger and paste the token  
-   (Swagger adds `Bearer` automatically)
-3. `GET /users/me` → returns the current user profile
-
----
-
-## Prisma
-
-Useful Prisma commands:
-
-```bash
-npx prisma migrate dev
 npx prisma migrate deploy
-npx prisma generate
 ```
 
 ---
 
-## Testing
+# Seed Database
 
-### Unit tests
-```bash
-npm test
+Generate demo data:
+
+```
+npm run db:seed
+```
+
+Example users:
+
+```
+admin@taskflow.dev
+member@taskflow.dev
+viewer@taskflow.dev
+password: Password123!
 ```
 
 ---
 
-### E2E tests
-This project uses a **separate database** for e2e tests.
+# Running Tests
 
-#### 1) Create `.env.test`
-Create a `.env.test` file at the project root:
+Start test database:
 
-```env
-NODE_ENV=test
-PORT=3001
-DATABASE_URL=postgresql://taskflow:taskflow@127.0.0.1:5433/taskflow_test?schema=public
-JWT_ACCESS_SECRET=test_secret
-JWT_ACCESS_EXPIRES_IN=15m
+```
+docker compose up -d
 ```
 
-> `.env.test` must NOT be committed (it is ignored in `.gitignore`).
+Run migrations for test DB:
+
+```
+npm run test:e2e:prepare
+```
+
+Run tests:
+
+```
+npm run test:e2e
+```
+
+Test coverage includes:
+
+* authentication
+* permissions
+* projects
+* tasks
+* comments
+* activity logs
+* notifications
+* attachments
 
 ---
 
-#### 2) Create the test database
-```bash
-docker exec -it taskflow-db psql -U taskflow -d postgres -c "CREATE DATABASE taskflow_test;"
+# Example Architecture
+
+```
+Client
+   │
+   ▼
+NestJS API
+   │
+   ├── Auth
+   ├── Projects
+   ├── Tasks
+   ├── Comments
+   ├── Attachments
+   ├── Notifications
+   └── Activity Log
+   │
+   ▼
+Prisma ORM
+   │
+   ▼
+PostgreSQL
 ```
 
 ---
 
-#### 3) Run migrations + e2e tests
-```bash
-npm run test:e2e:all
-```
+# Production Features
+
+This backend includes several features commonly used in production systems:
+
+* secure authentication
+* permission system
+* activity audit logging
+* realtime notifications
+* Docker deployment
+* CI pipeline
+* end-to-end tests
 
 ---
 
-## Scripts
-- `npm run start:dev` – start in watch mode
-- `npm run build` – compile the project
-- `npm run lint` – lint and fix
-- `npm run format` – prettier
-- `npm run test:e2e:all` – run e2e tests
+# Author
+
+Backend project built for portfolio purposes.
+
+Stack focus:
+
+* Node.js
+* NestJS
+* Prisma
+* PostgreSQL
+* Docker
 
 ---
 
-## Project Structure
-- `src/auth` – authentication and JWT
-- `src/users` – user endpoints
-- `src/prisma` – Prisma service
-- `prisma/` – schema and migrations
-- `test/` – e2e tests
+# License
 
----
-
-## Notes
-- Conventional Commits are used (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
-- Feature branches (`feature/*`) and PR-style workflow are followed,
-  even as a solo developer.
+UNLICENSED
