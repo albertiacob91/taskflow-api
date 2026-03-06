@@ -10,6 +10,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '@prisma/client';
 
 @Injectable()
 export class CommentsService {
@@ -18,6 +20,7 @@ export class CommentsService {
     private readonly projects: ProjectsService,
     private readonly activity: ActivityService,
     private readonly realtime: RealtimeGateway,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private async getCommentOrThrow(commentId: string) {
@@ -41,36 +44,73 @@ export class CommentsService {
   }
 
   async create(userId: string, dto: CreateCommentDto) {
-    const projectId = await this.getTaskProjectIdOrThrow(dto.taskId);
-    await this.projects.assertMemberOrOwner(projectId, userId);
+  const task = await this.prisma.task.findFirst({
+    where: { id: dto.taskId, deletedAt: null },
+    select: {
+      id: true,
+      projectId: true,
+      createdById: true,
+      assignedToId: true,
+    },
+  });
 
-    const comment = await this.prisma.comment.create({
-      data: {
-        content: dto.content,
-        taskId: dto.taskId,
-        authorId: userId,
-      },
-      select: {
-        id: true,
-        content: true,
-        taskId: true,
-        authorId: true,
-        createdAt: true,
-      },
-    });
+  if (!task) throw new NotFoundException('Task not found');
 
-    await this.activity.log({
-      type: ActivityType.COMMENT_CREATED,
-      actorId: userId,
-      projectId,
-      commentId: comment.id,
+  await this.projects.assertMemberOrOwner(task.projectId, userId);
+
+  const comment = await this.prisma.comment.create({
+    data: {
+      content: dto.content,
       taskId: dto.taskId,
+      authorId: userId,
+    },
+    select: {
+      id: true,
+      content: true,
+      taskId: true,
+      authorId: true,
+      createdAt: true,
+    },
+  });
+
+  await this.activity.log({
+    type: ActivityType.COMMENT_CREATED,
+    actorId: userId,
+    projectId: task.projectId,
+    commentId: comment.id,
+    taskId: dto.taskId,
+  });
+
+  if (task.createdById !== userId) {
+    await this.notifications.create({
+      type: NotificationType.COMMENT_ADDED,
+      userId: task.createdById,
+      actorId: userId,
+      projectId: task.projectId,
+      taskId: task.id,
+      commentId: comment.id,
     });
-
-    this.realtime.emitProjectEvent(projectId, 'comment.created', comment);
-
-    return comment;
   }
+
+  if (
+    task.assignedToId &&
+    task.assignedToId !== userId &&
+    task.assignedToId !== task.createdById
+  ) {
+    await this.notifications.create({
+      type: NotificationType.COMMENT_ADDED,
+      userId: task.assignedToId,
+      actorId: userId,
+      projectId: task.projectId,
+      taskId: task.id,
+      commentId: comment.id,
+    });
+  }
+
+  this.realtime.emitProjectEvent(task.projectId, 'comment.created', comment);
+
+  return comment;
+}
 
   async list(
     userId: string,

@@ -18,6 +18,7 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
 import { ActivityModule } from './activity/activity.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     ActivityModule,
     AttachmentsModule,
     RealtimeModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

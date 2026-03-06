@@ -11,15 +11,18 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { QueryTasksDto } from './dto/query-tasks.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '@prisma/client';
 
 @Injectable()
 export class TasksService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly projects: ProjectsService,
-    private readonly activity: ActivityService,
-    private readonly realtime: RealtimeGateway,
-  ) {}
+  private readonly prisma: PrismaService,
+  private readonly projects: ProjectsService,
+  private readonly activity: ActivityService,
+  private readonly realtime: RealtimeGateway,
+  private readonly notifications: NotificationsService,
+) {}
 
   private async getTaskOrThrow(taskId: string) {
     const task = await this.prisma.task.findFirst({
@@ -32,46 +35,57 @@ export class TasksService {
   }
 
   async create(userId: string, dto: CreateTaskDto) {
-    await this.projects.assertMemberOrOwner(dto.projectId, userId);
+  await this.projects.assertMemberOrOwner(dto.projectId, userId);
 
-    const task = await this.prisma.task.create({
-      data: {
-        title: dto.title,
-        description: dto.description ?? null,
-        status: dto.status ?? undefined,
-        priority: dto.priority ?? undefined,
-        dueDate: dto.dueDate ?? null,
-        projectId: dto.projectId,
-        createdById: userId,
-        assignedToId: dto.assignedToId ?? null,
-      },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        priority: true,
-        dueDate: true,
-        projectId: true,
-        createdById: true,
-        assignedToId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+  const task = await this.prisma.task.create({
+    data: {
+      title: dto.title,
+      description: dto.description ?? null,
+      status: dto.status ?? undefined,
+      priority: dto.priority ?? undefined,
+      dueDate: dto.dueDate ?? null,
+      projectId: dto.projectId,
+      createdById: userId,
+      assignedToId: dto.assignedToId ?? null,
+    },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      priority: true,
+      dueDate: true,
+      projectId: true,
+      createdById: true,
+      assignedToId: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 
-    await this.activity.log({
-      type: ActivityType.TASK_CREATED,
+  await this.activity.log({
+    type: ActivityType.TASK_CREATED,
+    actorId: userId,
+    projectId: task.projectId,
+    taskId: task.id,
+    meta: { title: task.title },
+  });
+
+  if (task.assignedToId) {
+    await this.notifications.create({
+      type: NotificationType.TASK_ASSIGNED,
+      userId: task.assignedToId,
       actorId: userId,
       projectId: task.projectId,
       taskId: task.id,
       meta: { title: task.title },
     });
-
-    this.realtime.emitProjectEvent(task.projectId, 'task.created', task);
-
-    return task;
   }
+
+  this.realtime.emitProjectEvent(task.projectId, 'task.created', task);
+
+  return task;
+}
 
   async list(userId: string, query: QueryTasksDto) {
     if (!query.projectId) throw new ForbiddenException('projectId is required');
@@ -145,34 +159,59 @@ export class TasksService {
   }
 
   async update(taskId: string, userId: string, dto: UpdateTaskDto) {
-    const task = await this.getTaskOrThrow(taskId);
+  const task = await this.getTaskOrThrow(taskId);
 
-    await this.projects.assertMemberOrOwner(task.projectId, userId);
+  await this.projects.assertMemberOrOwner(task.projectId, userId);
 
-    const updated = await this.prisma.task.update({
-      where: { id: taskId },
-      data: {
-        title: dto.title ?? undefined,
-        description: dto.description ?? undefined,
-        status: dto.status ?? undefined,
-        priority: dto.priority ?? undefined,
-        dueDate: dto.dueDate ?? undefined,
-        assignedToId: dto.assignedToId ?? undefined,
-      },
-    });
+  const before = await this.prisma.task.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      title: true,
+      assignedToId: true,
+      projectId: true,
+    },
+  });
 
-    await this.activity.log({
-      type: ActivityType.TASK_UPDATED,
+  const updated = await this.prisma.task.update({
+    where: { id: taskId },
+    data: {
+      title: dto.title ?? undefined,
+      description: dto.description ?? undefined,
+      status: dto.status ?? undefined,
+      priority: dto.priority ?? undefined,
+      dueDate: dto.dueDate ?? undefined,
+      assignedToId: dto.assignedToId ?? undefined,
+    },
+  });
+
+  await this.activity.log({
+    type: ActivityType.TASK_UPDATED,
+    actorId: userId,
+    projectId: task.projectId,
+    taskId,
+    meta: { title: updated.title },
+  });
+
+  if (
+    before &&
+    updated.assignedToId &&
+    updated.assignedToId !== before.assignedToId
+  ) {
+    await this.notifications.create({
+      type: NotificationType.TASK_ASSIGNED,
+      userId: updated.assignedToId,
       actorId: userId,
       projectId: task.projectId,
       taskId,
       meta: { title: updated.title },
     });
-
-    this.realtime.emitProjectEvent(task.projectId, 'task.updated', updated);
-
-    return updated;
   }
+
+  this.realtime.emitProjectEvent(task.projectId, 'task.updated', updated);
+
+  return updated;
+}
 
   async remove(taskId: string, userId: string) {
     const task = await this.getTaskOrThrow(taskId);
