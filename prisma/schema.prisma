@@ -26,23 +26,25 @@ enum TaskPriority {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
+  id           String  @id @default(uuid())
+  email        String  @unique
   passwordHash String
   name         String?
-  role         Role     @default(USER)
+  role         Role    @default(USER)
 
   refreshTokenJti String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  ownedProjects   Project[] @relation("ProjectOwner")
-  projectMembers  ProjectMember[]
-  tasksCreated    Task[]    @relation("TaskCreatedBy")
-  tasksAssigned   Task[]    @relation("TaskAssignedTo")
-  comments        Comment[]
+  ownedProjects  Project[]       @relation("ProjectOwner")
+  projectMembers ProjectMember[]
+  tasksCreated   Task[]          @relation("TaskCreatedBy")
+  tasksAssigned  Task[]          @relation("TaskAssignedTo")
+  comments       Comment[]
+
+  activityLogs ActivityLog[] @relation("ActivityActor")
 
   @@index([deletedAt])
 }
@@ -55,12 +57,14 @@ model Project {
   ownerId String
   owner   User   @relation("ProjectOwner", fields: [ownerId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   tasks   Task[]
   members ProjectMember[]
+
+  activityLogs ActivityLog[]
 
   @@index([ownerId])
   @@index([deletedAt])
@@ -94,10 +98,10 @@ model Task {
   createdBy   User   @relation("TaskCreatedBy", fields: [createdById], references: [id])
 
   assignedToId String?
-  assignedTo   User?  @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  assignedTo   User?   @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   comments Comment[]
@@ -119,11 +123,49 @@ model Comment {
   authorId String
   author   User   @relation(fields: [authorId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([taskId])
   @@index([authorId])
   @@index([deletedAt])
+}
+
+enum ActivityType {
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_DELETED
+
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_DELETED
+
+  COMMENT_CREATED
+  COMMENT_UPDATED
+  COMMENT_DELETED
+
+  MEMBER_ADDED
+  MEMBER_REMOVED
+}
+
+model ActivityLog {
+  id   String       @id @default(uuid())
+  type ActivityType
+
+  actorId String
+  actor   User   @relation("ActivityActor", fields: [actorId], references: [id])
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  taskId    String?
+  commentId String?
+
+  meta Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([actorId, createdAt])
 }
