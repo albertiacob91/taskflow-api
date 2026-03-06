@@ -35,7 +35,7 @@ export class TasksService {
   }
 
   async create(userId: string, dto: CreateTaskDto) {
-  await this.projects.assertMemberOrOwner(dto.projectId, userId);
+  await this.projects.assertProjectWritable(dto.projectId, userId);
 
   const task = await this.prisma.task.create({
     data: {
@@ -161,7 +161,7 @@ export class TasksService {
   async update(taskId: string, userId: string, dto: UpdateTaskDto) {
   const task = await this.getTaskOrThrow(taskId);
 
-  await this.projects.assertMemberOrOwner(task.projectId, userId);
+  await this.projects.assertProjectWritable(task.projectId, userId);
 
   const before = await this.prisma.task.findUnique({
     where: { id: taskId },
@@ -216,7 +216,7 @@ export class TasksService {
   async remove(taskId: string, userId: string) {
     const task = await this.getTaskOrThrow(taskId);
 
-    await this.projects.assertMemberOrOwner(task.projectId, userId);
+    await this.projects.assertProjectWritable(task.projectId, userId);
 
     await this.prisma.task.update({
       where: { id: taskId },

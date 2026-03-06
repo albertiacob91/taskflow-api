@@ -1,11 +1,11 @@
 import {
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
-  Inject,
   forwardRef,
 } from '@nestjs/common';
-import { ActivityType } from '@prisma/client';
+import { ActivityType, ProjectRole } from '@prisma/client';
 import { ActivityService } from '../activity/activity.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddProjectMemberDto } from './dto/add-project-member.dto';
@@ -15,10 +15,10 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 @Injectable()
 export class ProjectsService {
   constructor(
-  private readonly prisma: PrismaService,
-  @Inject(forwardRef(() => ActivityService))
-  private readonly activity: ActivityService,
-) {}
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => ActivityService))
+    private readonly activity: ActivityService,
+  ) {}
 
   private async getProjectOrThrow(projectId: string) {
     const project = await this.prisma.project.findFirst({
@@ -32,24 +32,54 @@ export class ProjectsService {
 
   async assertOwner(projectId: string, userId: string) {
     const project = await this.getProjectOrThrow(projectId);
+
     if (project.ownerId !== userId) {
       throw new ForbiddenException('Only owner allowed');
     }
+
     return project;
   }
 
-  async assertMemberOrOwner(projectId: string, userId: string) {
+  async assertProjectReadable(projectId: string, userId: string) {
     const project = await this.getProjectOrThrow(projectId);
 
-    if (project.ownerId === userId) return project;
+    if (project.ownerId === userId) {
+      return { project, role: 'OWNER' as const };
+    }
 
     const member = await this.prisma.projectMember.findUnique({
       where: { projectId_userId: { projectId, userId } },
-      select: { userId: true },
+      select: { role: true },
     });
 
     if (!member) throw new ForbiddenException('Not a project member');
-    return project;
+
+    return { project, role: member.role };
+  }
+
+  async assertProjectWritable(projectId: string, userId: string) {
+    const project = await this.getProjectOrThrow(projectId);
+
+    if (project.ownerId === userId) {
+      return { project, role: 'OWNER' as const };
+    }
+
+    const member = await this.prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+      select: { role: true },
+    });
+
+    if (!member) throw new ForbiddenException('Not a project member');
+    if (member.role === ProjectRole.VIEWER) {
+      throw new ForbiddenException('Viewer cannot modify project content');
+    }
+
+    return { project, role: member.role };
+  }
+
+  // compatibilidad con servicios ya existentes
+  async assertMemberOrOwner(projectId: string, userId: string) {
+    return this.assertProjectReadable(projectId, userId);
   }
 
   async create(userId: string, dto: CreateProjectDto) {
@@ -169,31 +199,38 @@ export class ProjectsService {
     if (project.ownerId === user.id) {
       return {
         ok: true,
-        member: { id: user.id, email: user.email, name: user.name },
+        member: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: 'OWNER',
+        },
       };
     }
 
+    const role = dto.role ?? ProjectRole.MEMBER;
+
     await this.prisma.projectMember.upsert({
       where: { projectId_userId: { projectId, userId: user.id } },
-      update: {},
-      create: { projectId, userId: user.id },
+      update: { role },
+      create: { projectId, userId: user.id, role },
     });
 
     await this.activity.log({
       type: ActivityType.MEMBER_ADDED,
       actorId: ownerId,
       projectId,
-      meta: { memberId: user.id, email: user.email },
+      meta: { memberId: user.id, email: user.email, role },
     });
 
     return {
       ok: true,
-      member: { id: user.id, email: user.email, name: user.name },
+      member: { id: user.id, email: user.email, name: user.name, role },
     };
   }
 
   async listMembers(projectId: string, userId: string) {
-    await this.assertMemberOrOwner(projectId, userId);
+    await this.assertProjectReadable(projectId, userId);
 
     const project = await this.prisma.project.findFirst({
       where: { id: projectId, deletedAt: null },
@@ -202,6 +239,7 @@ export class ProjectsService {
         owner: { select: { id: true, email: true, name: true } },
         members: {
           select: {
+            role: true,
             user: { select: { id: true, email: true, name: true } },
             createdAt: true,
           },
@@ -213,9 +251,10 @@ export class ProjectsService {
     if (!project) throw new NotFoundException('Project not found');
 
     return {
-      owner: project.owner,
+      owner: { ...project.owner, role: 'OWNER' },
       members: project.members.map((m) => ({
         ...m.user,
+        role: m.role,
         addedAt: m.createdAt,
       })),
     };

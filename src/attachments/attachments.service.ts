@@ -31,7 +31,7 @@ export class AttachmentsService {
   ) {
     const task = await this.getTaskOrThrow(taskId);
 
-    await this.projects.assertMemberOrOwner(task.projectId, userId);
+    await this.projects.assertProjectWritable(task.projectId, userId);
 
     return this.prisma.attachment.create({
       data: {
@@ -96,7 +96,7 @@ export class AttachmentsService {
 
     if (!attachment) throw new NotFoundException('Attachment not found');
 
-    await this.projects.assertMemberOrOwner(attachment.task.projectId, userId);
+    await this.projects.assertProjectWritable(attachment.task.projectId, userId);
 
     if (attachment.uploadedById !== userId) {
       throw new ForbiddenException('Only uploader can delete attachment');

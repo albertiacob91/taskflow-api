@@ -56,7 +56,7 @@ export class CommentsService {
 
   if (!task) throw new NotFoundException('Task not found');
 
-  await this.projects.assertMemberOrOwner(task.projectId, userId);
+  await this.projects.assertProjectWritable(task.projectId, userId);
 
   const comment = await this.prisma.comment.create({
     data: {
@@ -148,7 +148,7 @@ export class CommentsService {
     }
 
     const projectId = await this.getTaskProjectIdOrThrow(comment.taskId);
-    await this.projects.assertMemberOrOwner(projectId, userId);
+    await this.projects.assertProjectWritable(projectId, userId);
 
     const updated = await this.prisma.comment.update({
       where: { id: commentId },
@@ -174,7 +174,7 @@ export class CommentsService {
     }
 
     const projectId = await this.getTaskProjectIdOrThrow(comment.taskId);
-    await this.projects.assertMemberOrOwner(projectId, userId);
+    await this.projects.assertProjectWritable(projectId, userId);
 
     await this.prisma.comment.update({
       where: { id: commentId },
