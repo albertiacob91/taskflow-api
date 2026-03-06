@@ -180,6 +180,24 @@ Activity --> Prisma
 
 Prisma --> DB
 
+## Authentication Flow
+
+```mermaid
+sequenceDiagram
+
+User->>API: POST /auth/login
+API->>DB: Validate credentials
+DB-->>API: User found
+API-->>User: accessToken + refreshToken
+
+User->>API: Request protected endpoint
+API->>API: Validate JWT
+API-->>User: Response
+
+User->>API: POST /auth/refresh
+API->>DB: Validate refresh token
+API-->>User: New tokens
+
 # Project Structure
 
 ```
