@@ -7,6 +7,7 @@ import { ActivityType } from '@prisma/client';
 import { ActivityService } from '../activity/activity.service';
 import { ProjectsService } from '../projects/projects.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { QueryTasksDto } from './dto/query-tasks.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -17,6 +18,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly projects: ProjectsService,
     private readonly activity: ActivityService,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   private async getTaskOrThrow(taskId: string) {
@@ -65,6 +67,8 @@ export class TasksService {
       taskId: task.id,
       meta: { title: task.title },
     });
+
+    this.realtime.emitProjectEvent(task.projectId, 'task.created', task);
 
     return task;
   }
@@ -165,6 +169,8 @@ export class TasksService {
       meta: { title: updated.title },
     });
 
+    this.realtime.emitProjectEvent(task.projectId, 'task.updated', updated);
+
     return updated;
   }
 
@@ -184,6 +190,11 @@ export class TasksService {
       actorId: userId,
       projectId: task.projectId,
       taskId,
+    });
+
+    this.realtime.emitProjectEvent(task.projectId, 'task.deleted', {
+      id: taskId,
+      projectId: task.projectId,
     });
 
     return { ok: true };

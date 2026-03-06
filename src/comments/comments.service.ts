@@ -7,6 +7,7 @@ import { ActivityType } from '@prisma/client';
 import { ActivityService } from '../activity/activity.service';
 import { ProjectsService } from '../projects/projects.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 
@@ -16,6 +17,7 @@ export class CommentsService {
     private readonly prisma: PrismaService,
     private readonly projects: ProjectsService,
     private readonly activity: ActivityService,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   private async getCommentOrThrow(commentId: string) {
@@ -64,6 +66,8 @@ export class CommentsService {
       commentId: comment.id,
       taskId: dto.taskId,
     });
+
+    this.realtime.emitProjectEvent(projectId, 'comment.created', comment);
 
     return comment;
   }
