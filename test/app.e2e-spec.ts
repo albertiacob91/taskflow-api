@@ -795,4 +795,67 @@ it('project activity -> returns logs for project actions', async () => {
   expect(types).toContain('PROJECT_CREATED');
   expect(types).toContain('TASK_CREATED');
 });
+
+it('attachments -> upload -> list -> delete', async () => {
+  const email = `e2e_attach_${Date.now()}@example.com`;
+
+  const register = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email, password: 'Password123!', name: 'Attach User' })
+    .expect(201);
+
+  const token = register.body.accessToken as string;
+
+  const project = await request(app.getHttpServer())
+    .post('/projects')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ name: 'Attachment Project', description: 'attachments test' })
+    .expect(201);
+
+  const projectId = project.body.id as string;
+
+  const task = await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      title: 'Attachment Task',
+      projectId,
+      status: 'TODO',
+      priority: 'MEDIUM',
+    })
+    .expect(201);
+
+  const taskId = task.body.id as string;
+
+  const upload = await request(app.getHttpServer())
+    .post(`/tasks/${taskId}/attachments`)
+    .set('Authorization', `Bearer ${token}`)
+    .attach('file', Buffer.from('hello attachment'), 'note.txt')
+    .expect(201);
+
+  expect(upload.body).toHaveProperty('id');
+  expect(upload.body.originalName).toBe('note.txt');
+
+  const attachmentId = upload.body.id as string;
+
+  const list = await request(app.getHttpServer())
+    .get(`/tasks/${taskId}/attachments`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(Array.isArray(list.body)).toBe(true);
+  expect(list.body.some((a: any) => a.id === attachmentId)).toBe(true);
+
+  await request(app.getHttpServer())
+    .delete(`/attachments/${attachmentId}`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  const listAfter = await request(app.getHttpServer())
+    .get(`/tasks/${taskId}/attachments`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(listAfter.body.some((a: any) => a.id === attachmentId)).toBe(false);
+});
 });
