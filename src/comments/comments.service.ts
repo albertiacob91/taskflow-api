@@ -1,6 +1,12 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { ActivityType } from '@prisma/client';
+import { ActivityService } from '../activity/activity.service';
 import { ProjectsService } from '../projects/projects.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 
@@ -9,6 +15,7 @@ export class CommentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projects: ProjectsService,
+    private readonly activity: ActivityService,
   ) {}
 
   private async getCommentOrThrow(commentId: string) {
@@ -35,7 +42,7 @@ export class CommentsService {
     const projectId = await this.getTaskProjectIdOrThrow(dto.taskId);
     await this.projects.assertMemberOrOwner(projectId, userId);
 
-    return this.prisma.comment.create({
+    const comment = await this.prisma.comment.create({
       data: {
         content: dto.content,
         taskId: dto.taskId,
@@ -49,6 +56,16 @@ export class CommentsService {
         createdAt: true,
       },
     });
+
+    await this.activity.log({
+      type: ActivityType.COMMENT_CREATED,
+      actorId: userId,
+      projectId,
+      commentId: comment.id,
+      taskId: dto.taskId,
+    });
+
+    return comment;
   }
 
   async list(
@@ -82,22 +99,35 @@ export class CommentsService {
   async update(commentId: string, userId: string, dto: UpdateCommentDto) {
     const comment = await this.getCommentOrThrow(commentId);
 
-    // must be author
-    if (comment.authorId !== userId) throw new ForbiddenException('Only author allowed');
+    if (comment.authorId !== userId) {
+      throw new ForbiddenException('Only author allowed');
+    }
 
     const projectId = await this.getTaskProjectIdOrThrow(comment.taskId);
     await this.projects.assertMemberOrOwner(projectId, userId);
 
-    return this.prisma.comment.update({
+    const updated = await this.prisma.comment.update({
       where: { id: commentId },
       data: { content: dto.content },
     });
+
+    await this.activity.log({
+      type: ActivityType.COMMENT_UPDATED,
+      actorId: userId,
+      projectId,
+      commentId,
+      taskId: comment.taskId,
+    });
+
+    return updated;
   }
 
   async remove(commentId: string, userId: string) {
     const comment = await this.getCommentOrThrow(commentId);
 
-    if (comment.authorId !== userId) throw new ForbiddenException('Only author allowed');
+    if (comment.authorId !== userId) {
+      throw new ForbiddenException('Only author allowed');
+    }
 
     const projectId = await this.getTaskProjectIdOrThrow(comment.taskId);
     await this.projects.assertMemberOrOwner(projectId, userId);
@@ -106,6 +136,14 @@ export class CommentsService {
       where: { id: commentId },
       data: { deletedAt: new Date() },
       select: { id: true },
+    });
+
+    await this.activity.log({
+      type: ActivityType.COMMENT_DELETED,
+      actorId: userId,
+      projectId,
+      commentId,
+      taskId: comment.taskId,
     });
 
     return { ok: true };

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { ActivityType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -6,9 +6,10 @@ import { ProjectsService } from '../projects/projects.service';
 @Injectable()
 export class ActivityService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly projects: ProjectsService,
-  ) {}
+  private readonly prisma: PrismaService,
+  @Inject(forwardRef(() => ProjectsService))
+  private readonly projects: ProjectsService,
+) {}
 
   async log(data: {
     type: ActivityType;

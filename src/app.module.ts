@@ -17,8 +17,6 @@ import { HealthModule } from './health/health.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { ActivityModule } from './activity/activity.module';
 
-import { ActivityModule } from './activity/activity.module';
-
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),

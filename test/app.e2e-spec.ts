@@ -675,4 +675,50 @@ it('auth login -> rate limit returns 429 after too many requests', async () => {
 
   expect(lastStatus).toBe(429);
 });
+
+it('project activity -> returns logs for project actions', async () => {
+  const email = `e2e_activity_${Date.now()}@example.com`;
+
+  const register = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email, password: 'Password123!', name: 'Activity User' })
+    .expect(201);
+
+  const token = register.body.accessToken as string;
+
+  // create project -> should log PROJECT_CREATED
+  const createdProject = await request(app.getHttpServer())
+    .post('/projects')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ name: 'Activity Project', description: 'Project for activity logs' })
+    .expect(201);
+
+  const projectId = createdProject.body.id as string;
+
+  // create task -> should log TASK_CREATED
+  await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      title: 'Activity Task',
+      description: 'Task for activity logs',
+      projectId,
+      status: 'TODO',
+      priority: 'MEDIUM',
+    })
+    .expect(201);
+
+  // list activity
+  const activity = await request(app.getHttpServer())
+    .get(`/projects/${projectId}/activity?page=1&limit=20`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(Array.isArray(activity.body.items)).toBe(true);
+
+  const types = activity.body.items.map((x: any) => x.type);
+
+  expect(types).toContain('PROJECT_CREATED');
+  expect(types).toContain('TASK_CREATED');
+});
 });
