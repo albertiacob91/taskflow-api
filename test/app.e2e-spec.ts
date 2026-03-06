@@ -649,4 +649,30 @@ it('health -> returns ok and sets x-request-id header', async () => {
   expect(res.body).toEqual({ ok: true });
   expect(res.headers).toHaveProperty('x-request-id');
 });
+
+it('auth login -> rate limit returns 429 after too many requests', async () => {
+  const email = `e2e_rate_${Date.now()}@example.com`;
+  const password = 'Password123!';
+
+  // register user
+  await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email, password, name: 'Rate User' })
+    .expect(201);
+
+  let lastStatus = 0;
+
+  // attempt login many times
+  for (let i = 0; i < 12; i++) {
+    const res = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password });
+
+    lastStatus = res.status;
+
+    if (res.status === 429) break;
+  }
+
+  expect(lastStatus).toBe(429);
+});
 });
