@@ -858,4 +858,88 @@ it('attachments -> upload -> list -> delete', async () => {
 
   expect(listAfter.body.some((a: any) => a.id === attachmentId)).toBe(false);
 });
+
+it('notifications -> task assigned and comment added', async () => {
+  const ownerEmail = `e2e_notif_owner_${Date.now()}@example.com`;
+  const ownerReg = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: ownerEmail, password: 'Password123!', name: 'Owner' })
+    .expect(201);
+
+  const ownerToken = ownerReg.body.accessToken as string;
+
+  const memberEmail = `e2e_notif_member_${Date.now()}@example.com`;
+  const memberReg = await request(app.getHttpServer())
+    .post('/auth/register')
+    .send({ email: memberEmail, password: 'Password123!', name: 'Member' })
+    .expect(201);
+
+  const memberToken = memberReg.body.accessToken as string;
+  const memberId = memberReg.body.user.id as string;
+
+  const project = await request(app.getHttpServer())
+    .post('/projects')
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .send({ name: 'Notifications Project', description: 'notifications test' })
+    .expect(201);
+
+  const projectId = project.body.id as string;
+
+  await request(app.getHttpServer())
+    .post(`/projects/${projectId}/members`)
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .send({ email: memberEmail })
+    .expect(201);
+
+  const task = await request(app.getHttpServer())
+    .post('/tasks')
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .send({
+      title: 'Notifications Task',
+      projectId,
+      status: 'TODO',
+      priority: 'MEDIUM',
+      assignedToId: memberId,
+    })
+    .expect(201);
+
+  const taskId = task.body.id as string;
+
+  const memberNotifications1 = await request(app.getHttpServer())
+    .get('/notifications?page=1&limit=20')
+    .set('Authorization', `Bearer ${memberToken}`)
+    .expect(200);
+
+  expect(Array.isArray(memberNotifications1.body.items)).toBe(true);
+  expect(
+    memberNotifications1.body.items.some((n: any) => n.type === 'TASK_ASSIGNED'),
+  ).toBe(true);
+
+  await request(app.getHttpServer())
+    .post('/comments')
+    .set('Authorization', `Bearer ${memberToken}`)
+    .send({ content: 'Hello owner', taskId })
+    .expect(201);
+
+  const ownerNotifications = await request(app.getHttpServer())
+    .get('/notifications?page=1&limit=20')
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .expect(200);
+
+  expect(
+    ownerNotifications.body.items.some((n: any) => n.type === 'COMMENT_ADDED'),
+  ).toBe(true);
+
+  const firstNotifId = ownerNotifications.body.items[0].id as string;
+
+  await request(app.getHttpServer())
+    .patch(`/notifications/${firstNotifId}/read`)
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .expect(200);
+
+  await request(app.getHttpServer())
+    .patch('/notifications/read-all')
+    .set('Authorization', `Bearer ${ownerToken}`)
+    .expect(200);
+});
 });
