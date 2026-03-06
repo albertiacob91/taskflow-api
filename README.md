@@ -8,151 +8,105 @@
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED)
 ![License](https://img.shields.io/badge/license-UNLICENSED-lightgrey)
 
-Backend API for a **project and task management system** inspired by tools like **Linear / Jira / ClickUp**.
+Backend API for a **project and task management system** inspired by
+tools like **Linear / Jira / ClickUp**.
 
-This project demonstrates a **production-ready backend architecture** using **NestJS**, **Prisma**, and **PostgreSQL**, including authentication, permissions, activity logs, real-time notifications, testing, and Docker deployment.
+This project demonstrates a **production-ready backend architecture**
+using **NestJS**, **Prisma**, and **PostgreSQL**, including
+authentication, permissions, activity logs, real-time notifications,
+testing, and Docker deployment.
 
----
+------------------------------------------------------------------------
 
 # Features
 
-### Authentication & Security
+## Authentication & Security
 
-* JWT authentication
-* Refresh token rotation
-* Secure logout
-* Rate limiting
-* Role-based access control
+-   JWT authentication
+-   Refresh token rotation
+-   Secure logout
+-   Rate limiting
+-   Role-based access control
 
-### Project Management
+## Project Management
 
-* Create, update, delete projects
-* Project membership system
-* Role system:
+-   Create, update, delete projects
+-   Project membership system
+-   Roles: OWNER, MEMBER, VIEWER
+-   Permissions enforcement
 
-  * OWNER
-  * MEMBER
-  * VIEWER
-* Permissions enforcement
+## Tasks
 
-### Tasks
+-   Create, update, delete tasks
+-   Assign tasks to users
+-   Status and priority system
+-   Advanced filters (search, sorting, due date range, assignedTo,
+    createdBy)
 
-* Create, update, delete tasks
-* Assign tasks to users
-* Status and priority system
-* Advanced filters:
+## Comments
 
-  * search
-  * sorting
-  * due date range
-  * assignedTo / createdBy
+-   Comment on tasks
+-   Edit/delete by author
+-   Activity tracking
 
-### Comments
+## Attachments
 
-* Comment on tasks
-* Edit/delete by author
-* Activity tracking
+-   Upload files to tasks
+-   List attachments
+-   Delete attachments
 
-### Attachments
+## Notifications
 
-* Upload files to tasks
-* List attachments
-* Delete attachments
+-   Task assignment notifications
+-   Comment notifications
+-   WebSocket realtime updates
 
-### Notifications
+## Activity Log
 
-* Task assignment notifications
-* Comment notifications
-* WebSocket realtime updates
+Tracks system activity including: - Project changes - Task changes -
+Comment actions - Member changes
 
-### Activity Log
+## Observability
 
-Track system activity:
+-   Request ID middleware
+-   Request logging
+-   Health check endpoint
 
-* Project created/updated/deleted
-* Task created/updated/deleted
-* Comment actions
-* Member changes
+## Testing
 
-### Observability
+End‑to‑end tests with Jest and Supertest covering: authentication,
+permissions, projects, tasks, comments, notifications, attachments, and
+activity logs.
 
-* Request ID middleware
-* Request logging
-* Health check endpoint
+## DevOps
 
-### Testing
+-   Docker production build
+-   Docker Compose environment
+-   Prisma migrations
+-   Seed script
+-   GitHub Actions CI
 
-Comprehensive **end-to-end testing** with Jest and Supertest.
-
-Coverage includes:
-
-* authentication
-* permissions
-* projects
-* tasks
-* comments
-* notifications
-* attachments
-* activity logs
-
-### DevOps
-
-* Docker production build
-* Docker Compose environment
-* Prisma migrations
-* Seed script
-* GitHub Actions CI
-
----
+------------------------------------------------------------------------
 
 # Tech Stack
 
-Backend framework
+Backend: NestJS\
+Database: PostgreSQL + Prisma ORM\
+Authentication: JWT + Passport\
+Validation: class-validator / class-transformer\
+Realtime: Socket.IO\
+Testing: Jest + Supertest\
+Infrastructure: Docker / Docker Compose\
+Documentation: Swagger (OpenAPI)
 
-* NestJS
+------------------------------------------------------------------------
 
-Database
+# System Architecture
 
-* PostgreSQL
-* Prisma ORM
-
-Authentication
-
-* JWT
-* Passport
-
-Validation
-
-* class-validator
-* class-transformer
-
-Realtime
-
-* Socket.IO
-
-Testing
-
-* Jest
-* Supertest
-
-Infrastructure
-
-* Docker
-* Docker Compose
-
-Documentation
-
-* Swagger (OpenAPI)
-
----
-
-## System Architecture
-
-```mermaid
+``` mermaid
 graph TD
 
 Client[Client / Frontend]
-
 API[NestJS API]
 
 Auth[Auth Module]
@@ -184,14 +138,20 @@ Projects --> Prisma
 Tasks --> Prisma
 Comments --> Prisma
 Attachments --> Prisma
+Notifications --> Prisma
 Activity --> Prisma
 
 Prisma --> DB
+```
 
-## Authentication Flow
+# Authentication Flow
 
-```mermaid
+``` mermaid
 sequenceDiagram
+
+participant User
+participant API
+participant DB
 
 User->>API: POST /auth/login
 API->>DB: Validate credentials
@@ -205,213 +165,24 @@ API-->>User: Response
 User->>API: POST /auth/refresh
 API->>DB: Validate refresh token
 API-->>User: New tokens
-
-# Project Structure
-
-```
-src/
- ├── auth
- ├── users
- ├── projects
- ├── tasks
- ├── comments
- ├── attachments
- ├── notifications
- ├── activity
- ├── health
- ├── prisma
- └── common
 ```
 
----
+------------------------------------------------------------------------
 
-# API Documentation
-
-Swagger UI:
-
-```
-http://localhost:3001/docs
-```
-
-Example endpoints:
-
-```
-POST /auth/register
-POST /auth/login
-GET  /users/me
-
-POST /projects
-GET  /projects
-PATCH /projects/:id
-
-POST /tasks
-GET  /tasks
-PATCH /tasks/:id
-
-POST /comments
-GET  /comments
-
-POST /attachments
-GET  /notifications
-```
-
----
-
-# Running the Project
-
-## Install dependencies
-
-```
-npm install
-```
-
----
-
-# Running with Docker (recommended)
+# Running with Docker
 
 Start production environment:
 
-```
-npm run docker:prod
-```
+    npm run docker:prod
 
-API will be available at:
+API:
 
-```
-http://localhost:3001
-```
+    http://localhost:3001
 
 Swagger:
 
-```
-http://localhost:3001/docs
-```
+    http://localhost:3001/docs
 
 Health check:
 
-```
-http://localhost:3001/health
-```
-
----
-
-# Database
-
-The project uses **Prisma migrations**.
-
-Apply migrations:
-
-```
-npx prisma migrate deploy
-```
-
----
-
-# Seed Database
-
-Generate demo data:
-
-```
-npm run db:seed
-```
-
-Example users:
-
-```
-admin@taskflow.dev
-member@taskflow.dev
-viewer@taskflow.dev
-password: Password123!
-```
-
----
-
-# Running Tests
-
-Start test database:
-
-```
-docker compose up -d
-```
-
-Run migrations for test DB:
-
-```
-npm run test:e2e:prepare
-```
-
-Run tests:
-
-```
-npm run test:e2e
-```
-
-Test coverage includes:
-
-* authentication
-* permissions
-* projects
-* tasks
-* comments
-* activity logs
-* notifications
-* attachments
-
----
-
-# Example Architecture
-
-```
-Client
-   │
-   ▼
-NestJS API
-   │
-   ├── Auth
-   ├── Projects
-   ├── Tasks
-   ├── Comments
-   ├── Attachments
-   ├── Notifications
-   └── Activity Log
-   │
-   ▼
-Prisma ORM
-   │
-   ▼
-PostgreSQL
-```
-
----
-
-# Production Features
-
-This backend includes several features commonly used in production systems:
-
-* secure authentication
-* permission system
-* activity audit logging
-* realtime notifications
-* Docker deployment
-* CI pipeline
-* end-to-end tests
-
----
-
-# Author
-
-Backend project built for portfolio purposes.
-
-Stack focus:
-
-* Node.js
-* NestJS
-* Prisma
-* PostgreSQL
-* Docker
-
----
-
-# License
-
-UNLICENSED
+    http://localhost:3001/health
