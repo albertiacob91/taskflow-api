@@ -44,6 +44,8 @@ model User {
   tasksAssigned  Task[]          @relation("TaskAssignedTo")
   comments       Comment[]
 
+  attachments Attachment[]
+
   activityLogs ActivityLog[] @relation("ActivityActor")
 
   @@index([deletedAt])
@@ -105,6 +107,8 @@ model Task {
   deletedAt DateTime?
 
   comments Comment[]
+
+  attachments Attachment[]
 
   @@index([projectId])
   @@index([createdById])
@@ -168,4 +172,24 @@ model ActivityLog {
 
   @@index([projectId, createdAt])
   @@index([actorId, createdAt])
+}
+
+model Attachment {
+  id           String @id @default(uuid())
+  originalName String
+  storageName  String
+  mimeType     String
+  size         Int
+  path         String
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id])
+
+  uploadedById String
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([taskId, createdAt])
+  @@index([uploadedById, createdAt])
 }
