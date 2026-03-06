@@ -16,6 +16,8 @@ import { HealthModule } from './health/health.module';
 
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { ActivityModule } from './activity/activity.module';
+import { AttachmentsModule } from './attachments/attachments.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { ActivityModule } from './activity/activity.module';
     CommentsModule,
     HealthModule,
     ActivityModule,
+    AttachmentsModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [
