@@ -7,6 +7,11 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+  });
+
   app.useGlobalFilters(new HttpExceptionFilter());
 
   app.useGlobalPipes(
@@ -18,20 +23,20 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-  .setTitle('TaskFlow API')
-  .setDescription('Project & Task Management API')
-  .setVersion('1.0.0')
-  .addBearerAuth(
-    {
-      type: 'http',
-      scheme: 'bearer',
-      bearerFormat: 'JWT',
-      name: 'Authorization',
-      in: 'header',
-    },
-    'access-token',
-  )
-  .build();
+    .setTitle('TaskFlow API')
+    .setDescription('Project & Task Management API')
+    .setVersion('1.0.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        in: 'header',
+      },
+      'access-token',
+    )
+    .build();
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
