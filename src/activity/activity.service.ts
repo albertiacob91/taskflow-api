@@ -2,6 +2,7 @@ import { Injectable, ForbiddenException } from '@nestjs/common';
 import { ActivityType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { QueryActivityDto } from './dto/query-activity.dto';
 
 @Injectable()
@@ -9,7 +10,8 @@ export class ActivityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projects: ProjectsService,
-  ) {}
+    private readonly realtime: RealtimeGateway,
+) {}
 
   async log(data: {
     type: ActivityType;
@@ -19,7 +21,7 @@ export class ActivityService {
     commentId?: string | null;
     meta?: Prisma.InputJsonValue;
   }) {
-    return this.prisma.activityLog.create({
+    const activity = await this.prisma.activityLog.create({
       data: {
         type: data.type,
         actorId: data.actorId,
@@ -29,6 +31,10 @@ export class ActivityService {
         meta: data.meta ?? undefined,
       },
     });
+
+    this.realtime.emitProjectEvent(data.projectId, 'activityUpdated', activity);
+
+    return activity;
   }
 
   private buildWhere(base: Prisma.ActivityLogWhereInput, query: QueryActivityDto) {

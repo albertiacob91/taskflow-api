@@ -107,7 +107,7 @@ export class CommentsService {
     });
   }
 
-  this.realtime.emitProjectEvent(task.projectId, 'comment.created', comment);
+  this.realtime.emitProjectEvent(task.projectId, 'commentCreated', comment);
 
   return comment;
 }
@@ -163,6 +163,8 @@ export class CommentsService {
       taskId: comment.taskId,
     });
 
+    this.realtime.emitProjectEvent(projectId, 'commentUpdated', updated);
+
     return updated;
   }
 
@@ -190,6 +192,10 @@ export class CommentsService {
       taskId: comment.taskId,
     });
 
+    this.realtime.emitProjectEvent(projectId, 'commentDeleted', {
+      commentId,
+      taskId: comment.taskId,
+    });
     return { ok: true };
   }
 }
