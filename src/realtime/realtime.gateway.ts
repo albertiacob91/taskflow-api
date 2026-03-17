@@ -20,13 +20,28 @@ export class RealtimeGateway
   @WebSocketServer()
   server!: Server;
 
+  private presence = new Map<string, Set<string>>();
+
   handleConnection(client: Socket) {
-    // simple connection log
     // eslint-disable-next-line no-console
     console.log(`ws connected: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
+    for (const [projectId, clients] of this.presence.entries()) {
+      if (clients.has(client.id)) {
+        clients.delete(client.id);
+
+        this.server
+          .to(`project:${projectId}`)
+          .emit('presenceUpdated', { count: clients.size });
+
+        if (clients.size === 0) {
+          this.presence.delete(projectId);
+        }
+      }
+    }
+
     // eslint-disable-next-line no-console
     console.log(`ws disconnected: ${client.id}`);
   }
@@ -37,7 +52,19 @@ export class RealtimeGateway
     @ConnectedSocket() client: Socket,
   ) {
     const room = `project:${body.projectId}`;
+
     client.join(room);
+
+    if (!this.presence.has(body.projectId)) {
+      this.presence.set(body.projectId, new Set());
+    }
+
+    this.presence.get(body.projectId)!.add(client.id);
+
+    this.server.to(room).emit('presenceUpdated', {
+      count: this.presence.get(body.projectId)!.size,
+    });
+
     return { ok: true, room };
   }
 
@@ -47,7 +74,23 @@ export class RealtimeGateway
     @ConnectedSocket() client: Socket,
   ) {
     const room = `project:${body.projectId}`;
+
     client.leave(room);
+
+    const clients = this.presence.get(body.projectId);
+
+    if (clients) {
+      clients.delete(client.id);
+
+      this.server.to(room).emit('presenceUpdated', {
+        count: clients.size,
+      });
+
+      if (clients.size === 0) {
+        this.presence.delete(body.projectId);
+      }
+    }
+
     return { ok: true, room };
   }
 
