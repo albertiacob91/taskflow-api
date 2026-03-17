@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { unlink } from 'fs/promises';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class AttachmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projects: ProjectsService,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   private async getTaskOrThrow(taskId: string) {
@@ -33,7 +35,7 @@ export class AttachmentsService {
 
     await this.projects.assertProjectWritable(task.projectId, userId);
 
-    return this.prisma.attachment.create({
+    const attachment = await this.prisma.attachment.create({
       data: {
         originalName: file.originalname,
         storageName: file.filename,
@@ -55,6 +57,10 @@ export class AttachmentsService {
         createdAt: true,
       },
     });
+
+    this.realtime.emitProjectEvent(task.projectId, 'attachmentUploaded', attachment);
+
+    return attachment;
   }
 
   async list(userId: string, taskId: string) {
@@ -111,6 +117,9 @@ export class AttachmentsService {
     } catch {
       // ignore missing file on disk
     }
+    this.realtime.emitProjectEvent(attachment.task.projectId, 'attachmentDeleted', {
+      attachmentId,
+    });
 
     return { ok: true };
   }

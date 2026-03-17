@@ -82,7 +82,7 @@ export class TasksService {
     });
   }
 
-  this.realtime.emitProjectEvent(task.projectId, 'task.created', task);
+  this.realtime.emitProjectEvent(task.projectId, 'taskCreated', task);
 
   return task;
 }
@@ -208,7 +208,7 @@ export class TasksService {
     });
   }
 
-  this.realtime.emitProjectEvent(task.projectId, 'task.updated', updated);
+  this.realtime.emitProjectEvent(task.projectId, 'taskUpdated', updated);
 
   return updated;
 }
@@ -231,7 +231,7 @@ export class TasksService {
       taskId,
     });
 
-    this.realtime.emitProjectEvent(task.projectId, 'task.deleted', {
+    this.realtime.emitProjectEvent(task.projectId, 'taskDeleted', {
       id: taskId,
       projectId: task.projectId,
     });

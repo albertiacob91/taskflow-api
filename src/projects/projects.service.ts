@@ -8,6 +8,7 @@ import {
 import { ActivityType, ProjectRole } from '@prisma/client';
 import { ActivityService } from '../activity/activity.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { AddProjectMemberDto } from './dto/add-project-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -18,6 +19,7 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => ActivityService))
     private readonly activity: ActivityService,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   private async getProjectOrThrow(projectId: string) {
@@ -104,6 +106,7 @@ export class ProjectsService {
       projectId: project.id,
       meta: { name: project.name },
     });
+    this.realtime.emitProjectEvent(project.id, 'projectUpdated', project);
 
     return project;
   }
@@ -163,6 +166,7 @@ export class ProjectsService {
       projectId,
       meta: { name: project.name },
     });
+    this.realtime.emitProjectEvent(projectId, 'projectUpdated', project);
 
     return project;
   }
@@ -179,6 +183,9 @@ export class ProjectsService {
     await this.activity.log({
       type: ActivityType.PROJECT_DELETED,
       actorId: userId,
+      projectId,
+    });
+    this.realtime.emitProjectEvent(projectId, 'projectDeleted', {
       projectId,
     });
 
@@ -221,6 +228,13 @@ export class ProjectsService {
       actorId: ownerId,
       projectId,
       meta: { memberId: user.id, email: user.email, role },
+    });
+
+    this.realtime.emitProjectEvent(projectId, 'memberAdded', {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role,
     });
 
     return {
@@ -277,6 +291,10 @@ export class ProjectsService {
       actorId: ownerId,
       projectId,
       meta: { memberId: memberUserId },
+    });
+
+    this.realtime.emitProjectEvent(projectId, 'memberRemoved', {
+      memberId: memberUserId,
     });
 
     return { ok: true };
